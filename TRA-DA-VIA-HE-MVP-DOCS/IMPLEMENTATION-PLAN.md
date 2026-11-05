@@ -1968,7 +1968,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M1-E2-T2 — Server list, quick join
 - **Đọc:** §3.3 (`ServerCard`, quick join), §3.9 (`PresenceStore`).
 - **Phạm vi:** `apps/server/src/servers/servers.controller.ts`, `servers.service.ts`, test.
-- **Contract:** `GET /servers`, `POST /servers/quick-join`. `online` đọc qua interface `OnlineCounter { count(serverId): number }`, token `ONLINE_COUNTER`; card này cài bản trả 0, M1-E4-T3 thay bản thật. `freePlots` = plot PURCHASABLE không có shop chưa CLOSED.
+- **Contract:** `GET /servers`, `POST /servers/quick-join`. `online` đọc qua interface `OnlineCounter { count(serverId): Promise<number> }`, token `ONLINE_COUNTER`; card này cài bản trả 0, M1-E4-T3 thay bản thật. `freePlots` = plot PURCHASABLE không có shop chưa CLOSED.
 - **Test:** chỉ trả server ACTIVE; `load` đúng ở ngưỡng 39%, 40%, 74%, 75%; quick join chọn server đông nhất dưới `softCap`; tất cả đầy thì trả `SERVER_FULL`.
 - **AC:** không trả dữ liệu người chơi.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/servers.spec.ts`.

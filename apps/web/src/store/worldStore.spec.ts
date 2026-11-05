@@ -300,3 +300,58 @@ describe('worldStore: đăng xuất', () => {
     expect(refreshSession).not.toHaveBeenCalled();
   });
 });
+
+describe('worldStore: ngồi và đứng', () => {
+  const SEAT = 'P2-S3';
+
+  it('sitSeat gửi player:sit và cập nhật ghế của mình khi ack ok', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().sitSeat(SEAT);
+    expect(fake.lastEmit('player:sit').req).toEqual({ seatId: SEAT });
+    fake.lastEmit('player:sit').ack?.({ ok: true, data: { seatId: SEAT } });
+    await expect(p).resolves.toBe(true);
+    const st = useWorldStore.getState();
+    expect(st.self?.seatId).toBe(SEAT);
+    expect(st.takenSeats[SEAT]).toBe(USER);
+  });
+
+  it('SEAT_TAKEN hoặc TOO_FAR: giữ ghế cũ, đặt actionError bằng message của server', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().sitSeat(SEAT);
+    fake.lastEmit('player:sit').ack?.({ ok: false, error: { code: 'TOO_FAR', message: 'Quá xa ghế', retryable: false } });
+    await expect(p).resolves.toBe(false);
+    const st = useWorldStore.getState();
+    expect(st.self?.seatId).toBeNull();
+    expect(st.actionError).toEqual({ code: 'TOO_FAR', message: 'Quá xa ghế' });
+  });
+
+  it('standUp gửi player:stand và bỏ ghế khi ack ok; đang đứng thì không gửi', async () => {
+    await joinedWorld();
+    expect(await useWorldStore.getState().standUp()).toBe(false);
+    expect(fake.emitted.some((e) => e.event === 'player:stand')).toBe(false);
+
+    const sit = useWorldStore.getState().sitSeat(SEAT);
+    fake.lastEmit('player:sit').ack?.({ ok: true, data: { seatId: SEAT } });
+    await sit;
+
+    const stand = useWorldStore.getState().standUp();
+    fake.lastEmit('player:stand').ack?.({ ok: true, data: {} });
+    await expect(stand).resolves.toBe(true);
+    const st = useWorldStore.getState();
+    expect(st.self?.seatId).toBeNull();
+    expect(st.takenSeats[SEAT]).toBeUndefined();
+  });
+
+  it('không gửi player:sit khi chưa joined, hoặc khi đã ngồi', async () => {
+    expect(await useWorldStore.getState().sitSeat(SEAT)).toBe(false);
+    expect(fake.emitted.some((e) => e.event === 'player:sit')).toBe(false);
+
+    await joinedWorld();
+    const sit = useWorldStore.getState().sitSeat(SEAT);
+    fake.lastEmit('player:sit').ack?.({ ok: true, data: { seatId: SEAT } });
+    await sit;
+    const before = fake.emitted.length;
+    expect(await useWorldStore.getState().sitSeat('D1-S1')).toBe(false);
+    expect(fake.emitted.length).toBe(before);
+  });
+});

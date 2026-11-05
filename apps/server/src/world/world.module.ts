@@ -3,7 +3,7 @@ import { MovementService } from './movement.service.js';
 import { PresenceStore } from './presence.store.js';
 import { WorldTickService } from './world-tick.service.js';
 
-// Not imported by AppModule yet: wiring belongs to M1-E3-T4 (gateway handlers).
+// Imported by AppModule since M1-E3-T4 (WorldGateway uses PresenceStore and MovementService).
 @Module({
   providers: [PresenceStore, MovementService, WorldTickService],
   exports: [PresenceStore, MovementService],

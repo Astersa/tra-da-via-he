@@ -117,7 +117,7 @@ Quy tắc bổ sung:
 - Trong `apps/web`: `src/game/` (Phaser) không import `src/ui/` (React) và ngược lại; hai bên trao đổi qua `src/game/bridge.ts` và store.
 - Service nghiệp vụ không import gateway. Service gọi interface `RealtimePublisher` (định nghĩa trong `core/`, cài đặt trong `realtime/`, inject qua token `REALTIME_PUBLISHER`). Interface `StaffPresence` và `OnlineCounter` cũng theo cách này: `orders`, `servers`, `session` cần biết ai online mà không được phụ thuộc `world`.
 - `assertStaff` nằm trong `shops/`, nên `orders` không cần import `employment`. Ngược lại `employment` gọi `orders` để trả đơn khi nhân viên nghỉ.
-- `assertRegistered` (`core/account-guard.ts`) và `RateLimiter` (`core/rate-limiter.ts`) nằm trong `core/`, vì `economy`, `shops`, `employment` không được import `users`, và `auth` không được import `realtime`.
+- `JwtGuard`, `RolesGuard` (`core/jwt.guard.ts`), `assertRegistered` (`core/account-guard.ts`) và `RateLimiter` (`core/rate-limiter.ts`) nằm trong `core/`, vì `economy`, `shops`, `employment` không được import `users`, và `auth` không được import `realtime`.
 - `BootTasks` (`core/boot-tasks.ts`): module đăng ký việc phải xong trước `listen` (§3.10.4), giống cách `SessionEndHooks` nhận hook.
 - **Chỉ `economy/ledger.service.ts` được ghi `Wallet.balance/heldBalance` và `ShopTreasury.balance`.** `scripts/check-money-writes.mjs` fail nếu chuỗi `"Wallet"`, `"ShopTreasury"`, `.wallet.update`, `.shopTreasury.update` hoặc `.walletTransaction.create` xuất hiện ở ngoài `apps/server/src/economy/` (ngoại lệ: `test/`, `prisma/`).
 
@@ -1938,8 +1938,8 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 
 #### M1-E1-T3 — `JwtGuard`, `/me`, profile [HR]
 - **Đọc:** §3.3.
-- **Phạm vi:** `apps/server/src/auth/jwt.guard.ts`, `apps/server/src/users/**`, test.
-- **Contract:** `JwtGuard` đặt `req.user = { id, role, kind }`; kiểm tra `bannedAt` từ DB. `@CurrentUser()`. `RolesGuard` + `@Roles('ADMIN')`. `GET /me`, `PATCH /me/profile`.
+- **Phạm vi:** `apps/server/src/core/{jwt.ts,jwt.guard.ts,auth-core.module.ts}`, `apps/server/src/auth/**` (đổi import), `apps/server/src/users/**`, `apps/server/src/app.module.ts`, test.
+- **Contract:** `JwtGuard`, `RolesGuard`, `@Roles`, `@CurrentUser()` nằm trong `core/jwt.guard.ts` vì hầu hết module đều cần mà không được import `auth`. Chuyển `auth/jwt.ts` sang `core/jwt.ts` (`JWT_SECRET`, `readJwtSecret`, `signAccessToken`) và thêm `verifyAccessToken`. `AuthCoreModule` là module `@Global()`, cung cấp và export `JWT_SECRET`, `JwtGuard`, `RolesGuard`; `AuthModule` bỏ provider `JWT_SECRET` trùng. `JwtGuard` đặt `req.user = { id, role, kind }`; kiểm tra `bannedAt` từ DB. `GET /me`, `PATCH /me/profile` trong `users/`.
 - **Test:** thiếu token, token sai, token hết hạn: 401; user bị ban: 401; đổi tên trùng: `DISPLAY_NAME_TAKEN`; khách đổi được tên và nhân vật; `GET /me` của khách có `username:null`; response không có `passwordHash`; `PLAYER` gọi route `@Roles('ADMIN')` nhận 403.
 - **AC:** guard không tin claim nào ngoài `sub`; role và `kind` đọc từ DB.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/me.spec.ts`.

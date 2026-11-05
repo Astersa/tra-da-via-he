@@ -743,6 +743,38 @@ Bearer access token (JWT 15 phút, claim `sub`) trừ khi ghi khác. Refresh tok
 
 Quick Join chọn server ACTIVE **đông nhất** còn dưới `softCap`, không phải server vắng nhất, để gom người (R9).
 
+#### 3.3.1 Kiểu response (`packages/shared/src/rest.ts`)
+
+Các kiểu `WalletView`, `OrderView`, `ShopSummary`, `ApplicationView` lấy từ §3.4.1. Thời gian là chuỗi ISO. `BigInt` trong DB (số tiền, `id` ledger) luôn trả về dạng chuỗi.
+
+```ts
+interface UserView { id: Uuid; email: string; role: UserRole; mutedUntil: string | null; createdAt: string } // chỉ trả cho chính user đó
+interface ProfileView { userId: Uuid; displayName: string; avatarId: string }
+
+interface EmploymentView { id: Uuid; shopId: Uuid; serverId: Uuid; shopName: string; status: EmploymentStatus; hiredAt: string; endedAt: string | null; endReason: string | null } // chỉ trả cho chính nhân viên
+interface EmployeeView { id: Uuid; userId: Uuid; displayName: string; status: EmploymentStatus; hiredAt: string; endedAt: string | null } // không có endReason vì đồng nghiệp cũng xem được
+
+interface MenuItem { productId: string; name: string; price: Money; isActive: boolean; supplyCost: Money; minPrice: Money; maxPrice: Money }
+interface ShopDetail extends ShopSummary { ownerId: Uuid | null; ownerName: string | null; createdAt: string; menu: MenuItem[] } // staff thấy cả món isActive=false; khách chỉ thấy món đang bán
+interface PlotView { id: Uuid; mapSlot: string; kind: PlotKind; openFee: Money; shopId: Uuid | null; purchasable: boolean }
+interface TreasuryView { balance: Money; version: number }
+
+interface WalletTxView { id: string; type: WalletTxType; amountDelta: Money; heldDelta: Money; balanceAfter: Money; heldAfter: Money; refType: string; refId: string; createdAt: string }
+interface ShopTxView { id: string; type: ShopTxType; amountDelta: Money; balanceAfter: Money; refType: string; refId: string; createdAt: string }
+// Không trả idempotencyKey, txGroupId ra API.
+
+interface AdminServerView { id: Uuid; slug: string; name: string; status: GameServerStatus; softCap: number; hardCap: number; worldMapId: string; createdAt: string }
+interface ChatReportView { id: Uuid; reporterId: Uuid; reportedUserId: Uuid; serverId: Uuid; messageId: Uuid; messageText: string; reason: string; resolvedAt: string | null; createdAt: string }
+interface ReconcileReport { ok: boolean; checkedAt: string; violations: { rule: string; message: string; refType: string | null; refId: string | null }[] } // ok = violations rỗng
+interface HealthRes { status: 'ok' | 'degraded'; db?: 'up' | 'down' } // db thêm khi có Prisma; skeleton M0-E1-T4 chỉ trả status
+```
+
+**Field của các dòng còn lại trong bảng §3.3:** `user: UserView`, `profile: ProfileView`, `employment: EmploymentView` (nullable ở `GET /me/employment`), `employee: EmployeeView`, `application: ApplicationView`, `shop: ShopDetail`, `wallet: WalletView`, `treasury: TreasuryView`, `server: AdminServerView`. `granted`, `fee`, `dailyTopupFloor` là `Money`; `granted` bằng `"0"` khi không được bù. `nextCursor: string | null`.
+
+**`items` theo endpoint:** `/me/wallet/transactions` → `WalletTxView`; `/me/applications`, `/shops/:shopId/applications` → `ApplicationView`; `/me/orders`, `/shops/:shopId/orders` → `OrderView`; `/shops/:shopId/employees` → `EmployeeView`; `/treasury/transactions` → `ShopTxView`; `/admin/reports` → `ChatReportView`.
+
+**Ngoại lệ của quy tắc "số tiền không lấy từ client":** `price` ở `PUT .../menu/:productId` và `amount` ở `POST .../treasury/withdraw` là ý định của chủ quán, dùng `PositiveMoneySchema` (không nhận 0). Server vẫn kiểm tra quyền chủ, khoảng `minPrice..maxPrice` (`PRICE_OUT_OF_RANGE`) và số dư (`TREASURY_INSUFFICIENT`). Không có ngoại lệ nào khác.
+
 ### 3.4 Socket.IO event contracts
 
 **Kết nối:** `io(url, { auth: { token: accessToken }, transports: ['websocket'] })`. Middleware kiểm tra JWT và `bannedAt`; sai thì từ chối với `UNAUTHENTICATED`. Kết nối chỉ là "ở sảnh"; chỉ `world:join` mới tạo session.

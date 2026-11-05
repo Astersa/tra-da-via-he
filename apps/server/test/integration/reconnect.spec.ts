@@ -281,7 +281,7 @@ describe('reconnect trong grace (M1-E3-T5)', () => {
       expect((await reconnectService()).pendingCount()).toBe(0);
       const sid2 = await activeSessionId(a.id);
       expect(sid2).toBeDefined();
-      expect(sid2).not.toBe(sid1);
+      expect(sid2).toBe(sid1);
 
       await elapse(GRACE_MS + 300);
       await syncPoint(cb);

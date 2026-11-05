@@ -1,0 +1,17 @@
+services:
+  postgres-test:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: tdvh
+      POSTGRES_PASSWORD: tdvh_test
+      POSTGRES_DB: tdvh_test
+    ports:
+      - "5433:5432"
+    # Data lives in RAM and is discarded when the container is removed.
+    tmpfs:
+      - /var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tdvh -d tdvh_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import committed from "./street-01.json" with { type: "json" };
 import { buildStreet01, serializeMap } from "./gen-street-01.js";
+import { MAP_ID, street01Map } from "../index.js";
 import { TILE_SIZE, getPlots, getSeats, getSpawn, isWalkable, type TiledMap } from "./query.js";
 
 // Số này lấy từ config purchasablePlots = 4 (bảng config trong IMPLEMENTATION-PLAN.md).
@@ -41,6 +42,11 @@ const spawnTile = { tx: Math.floor(spawn.x / TILE_SIZE), ty: Math.floor(spawn.y 
 const reachable = reachableFrom(spawnTile);
 
 describe("street-01 generator", () => {
+  it("street01Map qua index khớp street-01.json và MAP_ID", () => {
+    expect(MAP_ID).toBe("street-01");
+    expect(street01Map).toEqual(committed);
+  });
+
   it("file đã commit khớp đúng đầu ra của generator", () => {
     expect(serializeMap(committed as TiledMap)).toBe(serializeMap(buildStreet01()));
   });

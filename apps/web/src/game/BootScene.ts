@@ -13,7 +13,7 @@ export class BootScene extends Phaser.Scene {
       .setOrigin(0, 0);
     this.add
       .text(width / 2, height / 2, 'Trà Đá Vỉa Hè', {
-        fontFamily: 'Baloo 2, sans-serif',
+        fontFamily: '"Baloo 2", sans-serif',
         fontSize: '48px',
         color: tokens['brown-900'],
       })

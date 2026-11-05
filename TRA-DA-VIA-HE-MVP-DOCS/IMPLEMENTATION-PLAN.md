@@ -143,7 +143,7 @@ Exact version, không dùng `^`. Chọn bản phát hành ít nhất 14 ngày tr
 | zustand / pngjs / @playwright/test | 5.0.16 / 7.0.0 / 1.64.1 | Không |
 | dependency-cruiser / oxlint / prettier | 18.7.0 / 1.89.0 / 3.9.10 | Không |
 | tsx / dotenv | 4.23.15 / 18.0.8 | Không |
-| @testing-library/react / user-event / jsdom | 16.3.3 / 14.6.8 / 30.1.3 | Không |
+| @testing-library/react / dom / user-event / jsdom | 16.3.3 / 10.4.2 / 14.6.8 / 30.1.3 | Không |
 | pino / prom-client | 10.4.0 / 15.1.3 | Không |
 | helmet / cookie-parser / supertest | 8.3.0 / 1.4.7 / 7.3.1 | Không |
 | @types/react, @types/react-dom / @types/pg / @types/cookie-parser | 19.3.0 / 8.23.1 / 1.4.10 | Không |
@@ -2079,7 +2079,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 
 #### M1-E5-T1 — API client, auth store, màn vào
 - **Đọc:** §3.3, §3.8, §3.10.6 (quy tắc 401).
-- **Phạm vi:** `apps/web/src/{api,store,ui}/**`, `apps/web/src/theme/**`.
+- **Phạm vi:** `apps/web/src/{api,store,ui}/**`, `apps/web/src/theme/**`, `apps/web/src/App.tsx` (render màn vào thay cho game tạm; game được mount lại ở M1-E5-T4), `apps/web/vite.config.ts` (test nhận `src/**/*.spec.{ts,tsx}`, môi trường jsdom cho file `.tsx`).
 - **Contract:** `api.ts`: `request<T>(path, opts)`, tự refresh 1 lần khi nhận 401, lỗi ném `ApiError{code,message}`. Mọi lệnh refresh trong trình duyệt chạy tuần tự giữa các tab qua `navigator.locks.request('tdvh-refresh', ...)`; trong lock, thử lại refresh đã có thì gửi cookie mới nhất (M1-E1-T2). Trình duyệt không có `navigator.locks` thì dùng hàng đợi trong tab. Parse response bằng schema shared. Store zustand: `authStore {user, accessToken, enterAsGuest, login, upgrade, logout, bootstrap}`. Access token chỉ trong bộ nhớ, không `localStorage`. Màn:
   - `EntryScreen`: ô tên, chọn 1 trong 4 nhân vật, nút "Vào uống trà đá" gọi `POST /auth/guest`; link "Đã có tài khoản? Đăng nhập".
   - `LoginScreen`: `username`, mật khẩu; không có link quên mật khẩu, hiện dòng "Quên mật khẩu thì nhờ admin đặt lại".

@@ -2157,6 +2157,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M1-E6-T1 — Chạy sau proxy, `startApp`, tắt gọn [HR]
 - **Đọc:** §3.10.2, §3.10.4; `apps/server/src/{main.ts,app.setup.ts}` hiện tại.
 - **Phạm vi:** `apps/server/src/{main.ts,app.setup.ts}`, `apps/server/src/realtime/world.gateway.ts`, `apps/server/test/integration/{proxy.spec.ts,boot-shutdown.spec.ts}`.
+- **Giá sàn:** `startApp` gọi `assertProductFloors(await prisma.product.findMany(), gameConfig)` trước `listen`; sai thì process thoát mã khác 0 (§3.6.5). Test trong `boot-shutdown.spec.ts`: với `GAME_COMMISSION_BPS=9000`, `startApp` ném lỗi và không mở cổng.
 - **Contract:** `NestFactory.create<NestExpressApplication>`. `configureApp(app)` (đã có) thêm `app.set('trust proxy', 1)`. `export async function startApp(app, port: number): Promise<void>` đúng 3 dòng §3.10.4. `main.ts`: `configureApp`, `app.enableShutdownHooks()`, `startApp(app, Number(process.env.PORT ?? 3000))`; `enableShutdownHooks` chỉ ở `main.ts`, không trong `configureApp`, vì test tạo nhiều app. Gateway có `beforeApplicationShutdown()` gọi `this.server.close()`. Không cập nhật `ServerSession` khi tắt.
 - **Test (viết trước):**
   - `X-Forwarded-For: 1.1.1.1` vượt giới hạn `/auth/login` thì `RATE_LIMITED`, nhưng `X-Forwarded-For: 2.2.2.2` vẫn qua: giới hạn tách theo IP.

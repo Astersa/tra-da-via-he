@@ -3,7 +3,6 @@ import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import {
-  ChatSendReqSchema,
   ServerEventSchemas,
   WorldStateSchema,
   displayNameKey,
@@ -18,8 +17,6 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
 import { signAccessToken } from '../../src/core/jwt.js';
-import { REALTIME_PUBLISHER } from '../../src/core/realtime-publisher.js';
-import { EventRouter, type SocketData } from '../../src/realtime/event-router.js';
 import { resetDb, seedDefaultShop, seedPlot, seedServer, testPrisma } from '../helpers/db.js';
 
 // IMPLEMENTATION-PLAN.md M1-E3-T4. Real socket.io-client, real PostgreSQL, no mocks.
@@ -93,22 +90,6 @@ beforeEach(async () => {
   await app.listen(0, LOOPBACK);
   const { port } = app.getHttpServer().address() as AddressInfo;
   url = `http://${LOOPBACK}:${port}`;
-
-  // Chat is not part of M1-E3-T4 (chat server is M1-E4-T5). This probe stands in for chat:send only to
-  // check that a message reaches the sender's server room and nothing else.
-  // TODO M1-E4-T5: the real chat:send handler replaces this probe. Remove this registration then,
-  // otherwise EventRouter.register throws "registered twice".
-  const publisher = app.get(REALTIME_PUBLISHER);
-  app.get(EventRouter).register('chat:send', {
-    schema: ChatSendReqSchema,
-    requireSession: true,
-    fn: async (ctx, req) => {
-      const serverId = (ctx.socket.data as SocketData).serverId ?? '';
-      const msg = { id: randomUUID(), userId: ctx.userId, displayName: 'probe', text: req.text, at: new Date().toISOString() };
-      publisher.toServer(serverId, 'chat:message', msg);
-      return { id: msg.id };
-    },
-  });
 });
 
 afterEach(async () => {

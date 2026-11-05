@@ -1,16 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { WorldStateSchema, type PlayerView, type ShopSummary, type WorldState } from '@tdvh/shared';
 import { PrismaService } from '../core/prisma.service.js';
+import { ChatService } from '../chat/chat.service.js';
 import { PresenceStore, type PresenceEntry } from '../world/presence.store.js';
 
 // IMPLEMENTATION-PLAN.md §3.4.1 WorldState (M1-E3-T4). Read only: nothing here writes to the DB.
 // Temporary values, replaced by later tasks: acceptingOrders=false and onlineStaff=0 (M3-E1-T2),
-// myOpenOrders=[] (M3-E2-T6), staff=null (M4-E1-T6), recentChat=[] (M1-E4-T5).
+// myOpenOrders=[] (M3-E2-T6), staff=null (M4-E1-T6). recentChat comes from ChatService (M1-E4-T5).
 @Injectable()
 export class WorldStateBuilder {
   constructor(
     @Inject(PrismaService) private readonly prisma: PrismaService,
     private readonly presence: PresenceStore,
+    @Inject(ChatService) private readonly chat: ChatService,
   ) {}
 
   // The caller must have added the user's presence entry for this session before calling.
@@ -81,7 +83,7 @@ export class WorldStateBuilder {
       })),
       // Seats held by players on this server, from presence (M1-E4-T4). Grace-period players keep theirs.
       takenSeats: entries.flatMap((e) => (e.seatId === null ? [] : [{ seatId: e.seatId, userId: e.userId }])),
-      recentChat: [],
+      recentChat: this.chat.getRecent(serverId),
       wallet: {
         balance: wallet.balance.toString(),
         held: wallet.heldBalance.toString(),

@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module.js';
+import { ChatService } from './chat/chat.service.js';
 import { ApiErrorFilter } from './core/app-error.filter.js';
 import { AuthCoreModule } from './core/auth-core.module.js';
 import { BootTasks } from './core/boot-tasks.js';
@@ -26,6 +27,7 @@ import { WorldModule } from './world/world.module.js';
     BootTasks,
     ReconnectService,
     WorldStateBuilder,
+    ChatService,
     WorldGateway,
   ],
 })

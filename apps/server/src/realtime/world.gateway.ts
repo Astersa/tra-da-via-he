@@ -1,5 +1,6 @@
 import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
+  ChatSendReqSchema,
   EmptySchema,
   getSpawn,
   PlayerInteractReqSchema,
@@ -17,6 +18,7 @@ import {
 } from '@tdvh/shared';
 import type { Socket } from 'socket.io';
 import { CLOCK, type Clock } from '../core/clock.js';
+import { ChatService } from '../chat/chat.service.js';
 import { AppError } from '../core/errors.js';
 import { PrismaService } from '../core/prisma.service.js';
 import { REALTIME_PUBLISHER, type RealtimePublisher } from '../core/realtime-publisher.js';
@@ -55,6 +57,7 @@ export class WorldGateway implements OnModuleInit {
     @Inject(WorldStateBuilder) private readonly builder: WorldStateBuilder,
     @Inject(ReconnectService) private readonly reconnect: ReconnectService,
     @Inject(PrismaService) private readonly prisma: PrismaService,
+    @Inject(ChatService) private readonly chat: ChatService,
   ) {}
 
   onModuleInit(): void {
@@ -108,6 +111,15 @@ export class WorldGateway implements OnModuleInit {
       requireSession: true,
       fn: (ctx, req) => this.locked(ctx, async () => this.sit(ctx, req)),
     });
+    this.router.register('chat:send', {
+      schema: ChatSendReqSchema,
+      requireSession: true,
+      fn: (ctx, req) =>
+        this.locked(ctx, async () => {
+          const cur = this.current(ctx);
+          return this.chat.send({ userId: ctx.userId, serverId: cur.serverId }, req);
+        }),
+    });
     this.router.register('player:stand', {
       schema: EmptySchema,
       requireSession: true,
@@ -150,6 +162,7 @@ export class WorldGateway implements OnModuleInit {
     }
 
     const state = await this.builder.build(userId, session.serverId, session.id);
+    this.chat.enter(session.serverId, userId, state.self.displayName);
     if (!reused) this.publisher.toServerExcept(session.serverId, userId, 'player:joined', state.self);
     if (reused && wasWaiting) {
       this.publisher.toServerExcept(session.serverId, userId, 'player:interacted', { userId, state: 'RECONNECTED' });
@@ -188,6 +201,7 @@ export class WorldGateway implements OnModuleInit {
     this.presence.add(this.spawnEntry(userId, session.serverId, session.id));
 
     const state = await this.builder.build(userId, session.serverId, session.id);
+    this.chat.enter(session.serverId, userId, state.self.displayName);
     this.publisher.toServerExcept(session.serverId, userId, 'player:joined', state.self);
     return state;
   }
@@ -240,6 +254,7 @@ export class WorldGateway implements OnModuleInit {
     if (entry && entry.sessionId === e.sessionId) {
       await this.saveLastPosition(e.sessionId, entry);
       this.presence.remove(e.userId);
+      this.chat.leave(e.serverId, e.userId);
     }
     this.publisher.toServerExcept(e.serverId, e.userId, 'player:left', { userId: e.userId, reason: e.reason });
   }

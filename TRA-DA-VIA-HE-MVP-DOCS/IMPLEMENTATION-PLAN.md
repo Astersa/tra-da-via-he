@@ -2038,7 +2038,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M1-E4-T1 — Sinh map, walkability
 - **Đọc:** §3.8 phần Map.
 - **Phạm vi:** `scripts/gen-map.ts`, `packages/shared/src/map/**`, `packages/shared/src/index.ts`.
-- **Contract:** `street-01.json` theo định dạng Tiled JSON, có commit. `isWalkable(map, px, py): boolean`, `getSeats(map): Seat[]`, `getPlots(map): PlotSlot[]`, `getSpawn(map): {x,y}`, `TILE_SIZE = 32`.
+- **Contract:** `street-01.json` theo định dạng Tiled JSON, có commit. `isWalkable(map, px, py): boolean`, `getSeats(map): Seat[]`, `getPlots(map): PlotSlot[]`, `getSpawn(map): {x,y}`, `TILE_SIZE = 32`. Server và web lấy map qua `street01Map` và `MAP_ID` export từ `@tdvh/shared`, không đọc file JSON; Phaser nạp bằng `this.cache.tilemap.add` hoặc `load.tilemapTiledJSON(key, street01Map)`.
 - **Test:** 7 slot đúng tên và vị trí; 28 ghế, id duy nhất, tất cả đi được; spawn đi được; đường không đi được; ngoài biên không đi được; chạy script hai lần ra cùng file (tất định); từ spawn đi tới được mọi ghế (BFS).
 - **AC:** không phụ thuộc Node trong `src/map`, chỉ script mới dùng `fs`.
 - **Verify:** `pnpm exec tsx scripts/gen-map.ts && pnpm --filter @tdvh/shared exec vitest run src/map`.

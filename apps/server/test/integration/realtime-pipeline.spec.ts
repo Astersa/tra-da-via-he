@@ -6,9 +6,11 @@ import { ChatSendReqSchema, EmptySchema, WorldJoinReqSchema, type Ack } from '@t
 import { SignJWT } from 'jose';
 import { io as connect, type Socket as ClientSocket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
 import { AppError } from '../../src/core/errors.js';
+import { AuthCoreModule } from '../../src/core/auth-core.module.js';
+import { PrismaModule } from '../../src/core/prisma.module.js';
+import { RealtimeModule } from '../../src/realtime/realtime.module.js';
 import { signAccessToken } from '../../src/core/jwt.js';
 import { REALTIME_PUBLISHER, type RealtimePublisher } from '../../src/core/realtime-publisher.js';
 import { ConnectionRegistry } from '../../src/realtime/connection-registry.js';
@@ -29,7 +31,8 @@ let handlerCalls = 0;
 // Real socket.io-client over a random port (listen(0)), real PostgreSQL. No mocks.
 beforeEach(async () => {
   await resetDb();
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
+  // Minimal module without WorldGateway, so the probe handlers below can register world:ping and world:join.
+  const moduleRef = await Test.createTestingModule({ imports: [PrismaModule, AuthCoreModule, RealtimeModule] }).compile();
   app = moduleRef.createNestApplication();
   configureApp(app);
   await app.listen(0, LOOPBACK);

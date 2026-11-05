@@ -3,10 +3,11 @@ import type { ClientEvent } from '@tdvh/shared';
 import type { Socket } from 'socket.io';
 import type { ZodType } from 'zod';
 
-// socket.data is set only by the server: auth sets userId, world:join sets sessionId.
+// socket.data is set only by the server: auth sets userId, world:join sets sessionId and serverId.
 export interface SocketData {
   userId?: string;
   sessionId?: string;
+  serverId?: string;
 }
 
 // Built from socket.data, never from the payload (§3.4).

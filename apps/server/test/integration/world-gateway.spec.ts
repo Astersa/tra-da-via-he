@@ -46,7 +46,7 @@ class Inbox {
     for (const event of SERVER_EVENTS) {
       socket.on(event, (payload: unknown) => {
         this.got.push({ event, payload });
-        for (const w of [...this.waiters]) w();
+        for (const w of this.waiters) w();
       });
     }
   }
@@ -96,6 +96,8 @@ beforeEach(async () => {
 
   // Chat is not part of M1-E3-T4 (chat server is M1-E4-T5). This probe stands in for chat:send only to
   // check that a message reaches the sender's server room and nothing else.
+  // TODO M1-E4-T5: the real chat:send handler replaces this probe. Remove this registration then,
+  // otherwise EventRouter.register throws "registered twice".
   const publisher = app.get(REALTIME_PUBLISHER);
   app.get(EventRouter).register('chat:send', {
     schema: ChatSendReqSchema,

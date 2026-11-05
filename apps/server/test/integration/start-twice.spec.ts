@@ -1,5 +1,5 @@
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type AddressInfo } from 'node:net';
 import path from 'node:path';
 import { io as connect, type Socket as ClientSocket } from 'socket.io-client';
@@ -20,6 +20,14 @@ const DATABASE_URL = process.env.DATABASE_URL ?? '';
 
 const renderYaml = readFileSync(path.join(REPO, 'render.yaml'), 'utf8');
 const START_COMMAND = /\n\s+startCommand: (.+)\n/.exec(renderYaml)?.[1] ?? '';
+
+// Windows: `bash` on PATH may be WSL (WindowsApps\bash.exe), which cannot run the render.yaml command.
+// Only Git for Windows' bash is used there. Without it, the start tests are skipped with a reason.
+const GIT_BASH_WIN = 'C:\\Program Files\\Git\\bin\\bash.exe';
+const BASH = process.platform === 'win32' ? GIT_BASH_WIN : 'bash';
+const HAS_BASH = process.platform !== 'win32' || existsSync(GIT_BASH_WIN);
+const NO_BASH_REASON = `no Git for Windows bash at ${GIT_BASH_WIN}; the render.yaml start command cannot run here`;
+if (!HAS_BASH) console.warn(`start-twice.spec.ts: skipping start tests: ${NO_BASH_REASON}`);
 
 const children: ChildProcess[] = [];
 const clients: ClientSocket[] = [];
@@ -48,11 +56,11 @@ function freePort(): Promise<number> {
 }
 
 // Runs the start command from render.yaml through bash, the same shell Render uses on Linux.
-// Windows has no POSIX shell for `exec`; bash from Git for Windows is used there, so the start path is checked
+// On Windows this is Git for Windows' bash (see BASH above), so the start path is checked
 // but the signal behaviour is not (see describe.runIf below).
 function startServer(port: number): { child: ChildProcess; output: () => string } {
   let out = '';
-  const child = spawn('bash', ['-c', START_COMMAND], {
+  const child = spawn(BASH, ['-c', START_COMMAND], {
     cwd: REPO,
     env: {
       ...process.env,
@@ -149,7 +157,7 @@ describe('render.yaml start command (§3.10.3, §3.10.4)', () => {
     expect(second.stdout).toMatch(/No pending migrations/i);
   }, 120_000);
 
-  it('starts, serves health, stops, starts again; the session from run 1 is ENDED by boot', async () => {
+  it.skipIf(!HAS_BASH)('starts, serves health, stops, starts again; the session from run 1 is ENDED by boot', async () => {
     const server = await seedServer();
     await testPrisma.gameServer.update({ where: { id: server.id }, data: { status: 'ACTIVE' } });
     const plot = await seedPlot(server.id, 'D1');
@@ -189,7 +197,7 @@ describe('render.yaml start command (§3.10.3, §3.10.4)', () => {
     expect(after.endReason).toBe('SERVER_RESTART');
   }, 180_000);
 
-  describe.runIf(process.platform !== 'win32')('signal (Linux only: Windows does not deliver SIGTERM)', () => {
+  describe.runIf(process.platform !== 'win32' && HAS_BASH)('signal (Linux only: Windows does not deliver SIGTERM)', () => {
     it('exits within 30 seconds of SIGTERM', async () => {
       const port = await freePort();
       const run = startServer(port);

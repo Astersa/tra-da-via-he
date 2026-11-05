@@ -3,6 +3,7 @@
 // Playwright's webServer (apps/web/playwright.config.ts) starts the built server and Vite, and stops them when the run ends.
 // With PLAYWRIGHT_BASE_URL set, nothing is prepared or started: the tests run against that URL as-is.
 // Extra arguments go to `playwright test`, e.g. `pnpm e2e -- prod-serve`.
+// `pnpm e2e -- --serve` runs against the built web served by the server, same origin, no Vite (M1-E6-T2).
 
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -26,8 +27,8 @@ function fail(msg) {
 }
 
 // Runs a command and stops the script on failure. pnpm is a .cmd on Windows, so shell mode is used there.
-function run(cmd, args, cwd) {
-  const res = spawnSync(cmd, args, { cwd, stdio: 'inherit', shell: process.platform === 'win32' && cmd === 'pnpm' });
+function run(cmd, args, cwd, env = process.env) {
+  const res = spawnSync(cmd, args, { cwd, env, stdio: 'inherit', shell: process.platform === 'win32' && cmd === 'pnpm' });
   if (res.status !== 0) fail(`${path.basename(cmd)} ${args.join(' ')} failed (exit ${res.status})`);
 }
 
@@ -59,12 +60,15 @@ async function truncateAll(url) {
 }
 
 async function main() {
-  // pnpm e2e -- <bộ lọc>: bỏ dấu '--' mà pnpm chuyển tiếp.
-  const passthrough = process.argv.slice(2).filter((a) => a !== '--');
+  // pnpm e2e -- <bộ lọc>: bỏ dấu '--' mà pnpm chuyển tiếp; --serve chọn chế độ cùng origin.
+  const args = process.argv.slice(2).filter((a) => a !== '--');
+  const serve = args.includes('--serve');
+  const passthrough = args.filter((a) => a !== '--serve');
+  const playwrightEnv = { ...process.env, E2E_SERVE: serve ? '1' : '' };
 
   if (process.env.PLAYWRIGHT_BASE_URL) {
     console.log(`e2e: PLAYWRIGHT_BASE_URL=${process.env.PLAYWRIGHT_BASE_URL}, skipping DB prep and servers`);
-    run('pnpm', ['--filter', '@tdvh/web', 'exec', 'playwright', 'test', ...passthrough], root);
+    run('pnpm', ['--filter', '@tdvh/web', 'exec', 'playwright', 'test', ...passthrough], root, playwrightEnv);
     return;
   }
 
@@ -74,15 +78,16 @@ async function main() {
   // Clean DB: TRUNCATE (the append-only triggers block row DELETE), keeping the migration history.
   await truncateAll(testEnv.DATABASE_URL);
 
-  const env = { ...process.env, DATABASE_URL: testEnv.DATABASE_URL };
-  const tsxRun = (script, args = []) =>
-    run(process.execPath, ['--env-file=.env.test', tsxCli, script, ...args], serverDir);
+  const env = { ...playwrightEnv, DATABASE_URL: testEnv.DATABASE_URL };
+  const tsxRun = (script, extra = []) =>
+    run(process.execPath, ['--env-file=.env.test', tsxCli, script, ...extra], serverDir);
   tsxRun('prisma/seed.ts');
   tsxRun('scripts/provision-server.ts', PROVISION_ARGS);
 
-  // The built server (dist/main.js) is started by Playwright's webServer, so build first.
+  // The built server (dist/main.js) is started by Playwright's webServer, so build first. The server serves apps/web/dist.
   run('pnpm', ['--filter', '@tdvh/shared', 'build'], root);
   run('pnpm', ['--filter', '@tdvh/server', 'build'], root);
+  run('pnpm', ['--filter', '@tdvh/web', 'build'], root);
 
   // Playwright loads apps/web/playwright.config.ts, which starts the server and Vite (and stops them afterwards).
   const res = spawnSync('pnpm', ['--filter', '@tdvh/web', 'exec', 'playwright', 'test', ...passthrough], {

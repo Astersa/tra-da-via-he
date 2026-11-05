@@ -5,7 +5,7 @@ import { PresenceStore, type PresenceEntry } from '../world/presence.store.js';
 
 // IMPLEMENTATION-PLAN.md §3.4.1 WorldState (M1-E3-T4). Read only: nothing here writes to the DB.
 // Temporary values, replaced by later tasks: acceptingOrders=false and onlineStaff=0 (M3-E1-T2),
-// myOpenOrders=[] (M3-E2-T6), staff=null (M4-E1-T6), takenSeats=[] (M1-E4-T4), recentChat=[] (M1-E4-T5).
+// myOpenOrders=[] (M3-E2-T6), staff=null (M4-E1-T6), recentChat=[] (M1-E4-T5).
 @Injectable()
 export class WorldStateBuilder {
   constructor(
@@ -79,7 +79,8 @@ export class WorldStateBuilder {
         openFee: p.openFee.toString(),
         shopId: p.shops.at(0)?.id ?? null,
       })),
-      takenSeats: [],
+      // Seats held by players on this server, from presence (M1-E4-T4). Grace-period players keep theirs.
+      takenSeats: entries.flatMap((e) => (e.seatId === null ? [] : [{ seatId: e.seatId, userId: e.userId }])),
       recentChat: [],
       wallet: {
         balance: wallet.balance.toString(),

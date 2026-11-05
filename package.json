@@ -7,7 +7,7 @@
   "scripts": {
     "test:db:up": "docker compose -f docker-compose.test.yml up -d --wait",
     "test:db:down": "docker compose -f docker-compose.test.yml down -v",
-    "lint": "pnpm --filter @tdvh/server lint && oxlint -c .oxlintrc.json apps/web/src packages/shared/src scripts",
+    "lint": "pnpm --filter @tdvh/server lint && oxlint --type-aware -c .oxlintrc.json apps/web/src packages/shared/src && oxlint -c .oxlintrc.json scripts",
     "lint:boundaries": "depcruise --config .dependency-cruiser.cjs apps/server/src apps/web/src packages/shared/src",
     "check:money": "node scripts/check-money-writes.mjs",
     "test:scripts": "node --test scripts/check-money-writes.spec.mjs",
@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "dependency-cruiser": "18.7.0",
-    "oxlint": "1.89.0"
+    "oxlint": "1.89.0",
+    "oxlint-tsgolint": "7.0.2005"
   }
 }

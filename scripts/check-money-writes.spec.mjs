@@ -88,7 +88,43 @@ test('positive: the string "Wallet" in web source fails', () => {
     const v = findMoneyWriteViolations(root);
     assert.equal(v.length, 1);
     assert.equal(v[0].file, 'apps/web/src/store/wallet.ts');
-    assert.equal(v[0].token, 'Wallet');
+    assert.equal(v[0].token, '"Wallet"');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('negative: WalletView type, WalletHud component and WalletView props outside economy pass', () => {
+  const root = fixture({
+    'apps/server/src/orders/x.ts': 'const v: WalletView = wallet;\n',
+    'apps/web/src/ui/WalletHud.tsx': 'export const WalletHud = () => null;\n',
+  });
+  try {
+    assert.deepEqual(findMoneyWriteViolations(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('positive: raw SQL quoted table name "Wallet" outside economy fails', () => {
+  const root = fixture({
+    'apps/server/src/orders/x.ts': 'await db.$executeRaw`UPDATE "Wallet" SET balance = 0`;\n',
+  });
+  try {
+    const v = findMoneyWriteViolations(root);
+    assert.deepEqual(v, [{ file: 'apps/server/src/orders/x.ts', line: 1, token: '"Wallet"' }]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('positive: raw SQL quoted table name "ShopTreasury" outside economy fails', () => {
+  const root = fixture({
+    'apps/server/src/shops/x.ts': 'await db.$executeRaw`UPDATE "ShopTreasury" SET balance = 0`;\n',
+  });
+  try {
+    const v = findMoneyWriteViolations(root);
+    assert.deepEqual(v, [{ file: 'apps/server/src/shops/x.ts', line: 1, token: '"ShopTreasury"' }]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

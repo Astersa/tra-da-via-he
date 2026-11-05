@@ -9,8 +9,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const FORBIDDEN_TOKENS = [
-  'Wallet',
-  'ShopTreasury',
+  '"Wallet"',
+  '"ShopTreasury"',
   '.wallet.update',
   '.shopTreasury.update',
   '.walletTransaction.create',

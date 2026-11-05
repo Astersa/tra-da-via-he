@@ -1926,8 +1926,13 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M1-E1-T2 — Refresh, logout [HR]
 - **Đọc:** §3.3; §3.2.2 model `RefreshToken`.
 - **Phạm vi:** `apps/server/src/auth/**`, `test/integration/auth-refresh.spec.ts`.
-- **Contract:** token ngẫu nhiên 32 byte; lưu sha256; hạn 30 ngày; cookie theo §3.3. `POST /auth/guest` và `POST /auth/login` đặt cookie. Mỗi lần refresh: thu hồi token cũ, tạo token mới, đặt `replacedBy`. **Dùng lại token đã thu hồi thì thu hồi toàn bộ token của user** (phát hiện đánh cắp). Logout gọi `RealtimePublisher.disconnectUser` khi đã có (M1-E3-T2 nối vào).
-- **Test (viết trước):** khách và người đăng nhập đều nhận cookie đúng cờ, có `Secure` khi `NODE_ENV=production`; xoay vòng đúng; dùng lại token cũ làm mất cả chuỗi; token hết hạn bị từ chối; logout làm mất hiệu lực; 2 refresh song song cùng token: tối đa một token mới còn hiệu lực.
+- **Contract:** token ngẫu nhiên 32 byte; lưu sha256; hạn 30 ngày; cookie tên `tdvh_refresh`, thuộc tính theo §3.3. `POST /auth/guest` và `POST /auth/login` đặt cookie. Mỗi lần refresh chạy trong `withTx`, câu đầu là `pg_advisory_xact_lock(hashtextextended('refresh:' || $userId, 0))`, rồi đọc lại dòng token:
+  - Token còn hiệu lực: thu hồi, tạo token mới, đặt `replacedBy`.
+  - **Ân hạn:** token đã thu hồi, có `replacedBy`, `revokedAt` cách `now` không quá `REFRESH_REUSE_GRACE_SECONDS = 30`, và token kế tiếp còn hiệu lực: thu hồi token kế tiếp, tạo token mới, đổi `replacedBy` của token cũ sang token mới, trả 200. Lý do: phản hồi refresh có thể mất khi service khởi động lại, và khách không có mật khẩu nên mất chuỗi token là mất nhân vật vĩnh viễn.
+  - **Ngoài ân hạn, dùng lại token đã thu hồi thì thu hồi toàn bộ token của user** (phát hiện đánh cắp), trả `UNAUTHENTICATED`.
+  - Token thiếu, sai, hết hạn hoặc user bị ban: `UNAUTHENTICATED` (401), không tạo token.
+  - Logout gọi `RealtimePublisher.disconnectUser` khi đã có (M1-E3-T2 nối vào).
+- **Test (viết trước):** khách và người đăng nhập đều nhận cookie đúng cờ, có `Secure` khi `NODE_ENV=production`; xoay vòng đúng; dùng lại token cũ sau 31 giây làm mất cả chuỗi; dùng lại token cũ sau 29 giây được token mới, token kế tiếp cũ mất hiệu lực và token khác của user không bị ảnh hưởng; token hết hạn bị từ chối; user bị ban bị từ chối; logout làm mất hiệu lực; 2 refresh song song cùng token: cả hai trả 200 và đúng một token của chuỗi còn hiệu lực. Thời gian giả qua `Clock`.
 - **AC:** không lưu token thô.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/auth-refresh.spec.ts`.
 
@@ -2073,7 +2078,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M1-E5-T1 — API client, auth store, màn vào
 - **Đọc:** §3.3, §3.8, §3.10.6 (quy tắc 401).
 - **Phạm vi:** `apps/web/src/{api,store,ui}/**`, `apps/web/src/theme/**`.
-- **Contract:** `api.ts`: `request<T>(path, opts)`, tự refresh 1 lần khi nhận 401, lỗi ném `ApiError{code,message}`. Parse response bằng schema shared. Store zustand: `authStore {user, accessToken, enterAsGuest, login, upgrade, logout, bootstrap}`. Access token chỉ trong bộ nhớ, không `localStorage`. Màn:
+- **Contract:** `api.ts`: `request<T>(path, opts)`, tự refresh 1 lần khi nhận 401, lỗi ném `ApiError{code,message}`. Mọi lệnh refresh trong trình duyệt chạy tuần tự giữa các tab qua `navigator.locks.request('tdvh-refresh', ...)`; trong lock, thử lại refresh đã có thì gửi cookie mới nhất (M1-E1-T2). Trình duyệt không có `navigator.locks` thì dùng hàng đợi trong tab. Parse response bằng schema shared. Store zustand: `authStore {user, accessToken, enterAsGuest, login, upgrade, logout, bootstrap}`. Access token chỉ trong bộ nhớ, không `localStorage`. Màn:
   - `EntryScreen`: ô tên, chọn 1 trong 4 nhân vật, nút "Vào uống trà đá" gọi `POST /auth/guest`; link "Đã có tài khoản? Đăng nhập".
   - `LoginScreen`: `username`, mật khẩu; không có link quên mật khẩu, hiện dòng "Quên mật khẩu thì nhờ admin đặt lại".
   - Component `Panel`, `Button`, `Field` dùng token. Thông báo lỗi theo mã bằng tiếng Việt trong `ui/errorText.ts`, mọi `ErrorCode` phải có.

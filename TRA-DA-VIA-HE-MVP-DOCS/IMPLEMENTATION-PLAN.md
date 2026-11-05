@@ -1327,6 +1327,8 @@ Không queue worker: không gửi thư, sweeper đủ dùng, không có job nặ
 
 **`GameConfig`** (`apps/server/src/core/game-config.ts`, parse bằng zod, ghi đè qua env `GAME_*`). Đây là nơi duy nhất chứa con số; **mọi giá trị là đề xuất để playtest**, xem §5.
 
+Tên env là `GAME_` cộng tên key dạng SCREAMING_SNAKE_CASE, ví dụ `commissionBps` → `GAME_COMMISSION_BPS`. Kiểu dữ liệu: `guestStarterGrant`, `registerBonus`, `dailyTopupFloor`, `shopOpenFee` là tiền (`bigint`, chuỗi số nguyên không âm trong env); `commissionBps`, `withdrawFeeBps` là số nguyên 0..10000; mọi key còn lại là số nguyên không âm, gồm `commissionPairDailyCap` (số đơn mỗi cặp trong một ngày, không phải tiền).
+
 | Khóa | Mặc định | Khóa | Mặc định |
 |---|---|---|---|
 | `guestStarterGrant` | 300 | `orderTtlSeconds` | 600 |

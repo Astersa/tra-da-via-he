@@ -1,0 +1,162 @@
+{
+  "images": [
+    {
+      "key": "shop_default_1",
+      "url": "/assets/shop_default_1.png",
+      "width": 160,
+      "height": 160
+    },
+    {
+      "key": "shop_default_2",
+      "url": "/assets/shop_default_2.png",
+      "width": 160,
+      "height": 160
+    },
+    {
+      "key": "shop_default_3",
+      "url": "/assets/shop_default_3.png",
+      "width": 160,
+      "height": 160
+    },
+    {
+      "key": "shop_player",
+      "url": "/assets/shop_player.png",
+      "width": 160,
+      "height": 160
+    },
+    {
+      "key": "plot_empty",
+      "url": "/assets/plot_empty.png",
+      "width": 160,
+      "height": 160
+    },
+    {
+      "key": "awning",
+      "url": "/assets/awning.png",
+      "width": 160,
+      "height": 160
+    },
+    {
+      "key": "table_low",
+      "url": "/assets/table_low.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "key": "stool_blue",
+      "url": "/assets/stool_blue.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "key": "stool_red",
+      "url": "/assets/stool_red.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "key": "stool_orange",
+      "url": "/assets/stool_orange.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "key": "chalkboard",
+      "url": "/assets/chalkboard.png",
+      "width": 64,
+      "height": 32
+    },
+    {
+      "key": "tree",
+      "url": "/assets/tree.png",
+      "width": 64,
+      "height": 64
+    },
+    {
+      "key": "plant",
+      "url": "/assets/plant.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "key": "logo",
+      "url": "/assets/logo.png",
+      "width": 256,
+      "height": 96
+    },
+    {
+      "key": "icon_xu",
+      "url": "/assets/icon_xu.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "key": "icon_tea",
+      "url": "/assets/icon_tea.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "key": "emote_wave",
+      "url": "/assets/emote_wave.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "key": "emote_cheers",
+      "url": "/assets/emote_cheers.png",
+      "width": 32,
+      "height": 32
+    },
+    {
+      "key": "emote_nod",
+      "url": "/assets/emote_nod.png",
+      "width": 32,
+      "height": 32
+    }
+  ],
+  "spritesheets": [
+    {
+      "key": "avatar_01",
+      "url": "/assets/avatar_01.png",
+      "frameWidth": 32,
+      "frameHeight": 48
+    },
+    {
+      "key": "avatar_02",
+      "url": "/assets/avatar_02.png",
+      "frameWidth": 32,
+      "frameHeight": 48
+    },
+    {
+      "key": "avatar_03",
+      "url": "/assets/avatar_03.png",
+      "frameWidth": 32,
+      "frameHeight": 48
+    },
+    {
+      "key": "avatar_04",
+      "url": "/assets/avatar_04.png",
+      "frameWidth": 32,
+      "frameHeight": 48
+    }
+  ],
+  "tilesets": [
+    {
+      "key": "street",
+      "url": "/assets/street.png",
+      "tileWidth": 32,
+      "tileHeight": 32,
+      "tileCount": 6,
+      "columns": 6,
+      "tileNames": [
+        "pavement",
+        "road",
+        "curb",
+        "grass",
+        "wall",
+        "blocked"
+      ]
+    }
+  ]
+}

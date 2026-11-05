@@ -1,16 +1,34 @@
 import { Body, Controller, HttpCode, Post, Req, Res, UseGuards } from '@nestjs/common';
-import { AuthResSchema, GuestReqSchema, LoginReqSchema, RefreshResSchema } from '@tdvh/shared';
+import {
+  AuthResSchema,
+  GuestReqSchema,
+  LoginReqSchema,
+  RefreshResSchema,
+  UpgradeReqSchema,
+  UpgradeResSchema,
+} from '@tdvh/shared';
 import type { Request, Response } from 'express';
 import { AppError } from '../core/errors.js';
+import { CurrentUser, JwtGuard, type AuthUser } from '../core/jwt.guard.js';
 import { parseOrThrow } from '../core/validation.js';
 import { AuthService } from './auth.service.js';
 import { IpRateLimit, IpRateLimitGuard } from './ip-rate-limit.guard.js';
 import { REFRESH_COOKIE, refreshCookieOptions } from './refresh-token.service.js';
 
-// POST /auth/upgrade belongs to a later card. There is no /auth/register (B5).
+// There is no /auth/register (B5): the only way to get an account is to upgrade a guest.
 @Controller('auth')
 export class AuthController {
   constructor(private readonly auth: AuthService) {}
+
+  // The refresh cookie is kept as it is: the same user keeps the same session.
+  @Post('upgrade')
+  @HttpCode(200)
+  @UseGuards(IpRateLimitGuard, JwtGuard)
+  @IpRateLimit(5, 5 / 60)
+  async upgrade(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    const input = parseOrThrow(UpgradeReqSchema, body);
+    return UpgradeResSchema.parse(await this.auth.upgrade(user.id, input));
+  }
 
   @Post('guest')
   @UseGuards(IpRateLimitGuard)

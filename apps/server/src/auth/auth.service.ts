@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { AuthResSchema, type GuestReq, type LoginReq } from '@tdvh/shared';
+import { AuthResSchema, type GuestReq, type LoginReq, type UpgradeReq } from '@tdvh/shared';
 import type { z } from 'zod';
 import { CLOCK, startOfVnDay, type Clock } from '../core/clock.js';
 import { AppError } from '../core/errors.js';
 import { GAME_CONFIG, type GameConfig } from '../core/game-config.js';
 import { PrismaService } from '../core/prisma.service.js';
-import { withTx } from '../core/tx.js';
+import { pgCode, withTx } from '../core/tx.js';
 import { UsersService } from '../users/users.service.js';
 import { PasswordService } from './password.service.js';
 import { JWT_SECRET, signAccessToken } from '../core/jwt.js';
@@ -22,6 +22,13 @@ const DUMMY_HASH =
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type AuthRes = z.output<typeof AuthResSchema>;
+
+// Unique violation (23505) on User.username only. Any other 23505 is not a taken username.
+function isUsernameTaken(err: unknown): boolean {
+  if (pgCode(err) !== '23505') return false;
+  const cause = (err as { meta?: { driverAdapterError?: unknown } } | null)?.meta?.driverAdapterError;
+  return JSON.stringify(cause ?? {}).includes('User_username_key') || String((err as Error).message).includes('User_username_key');
+}
 
 @Injectable()
 export class AuthService {
@@ -84,6 +91,25 @@ export class AuthService {
     }
     const refresh = await this.refreshTokens.issue(user.id);
     return { auth: await this.authResponse(user), refresh };
+  }
+
+  // Turns a GUEST into a REGISTERED user in place: same id, profile, wallet and refresh tokens.
+  // The password is hashed before the transaction so argon2 does not hold row locks.
+  // The conditional UPDATE is the race guard: a second upgrade of the same user matches 0 rows.
+  async upgrade(userId: string, input: UpgradeReq): Promise<AuthRes> {
+    const passwordHash = await this.passwords.hash(input.password);
+    const user = await withTx(this.prisma, async (tx) => {
+      const { count } = await tx.user.updateMany({
+        where: { id: userId, kind: 'GUEST' },
+        data: { kind: 'REGISTERED', username: input.username, passwordHash },
+      });
+      if (count === 0) throw new AppError('ALREADY_REGISTERED');
+      return tx.user.findUniqueOrThrow({ where: { id: userId } });
+    }).catch((err: unknown) => {
+      if (isUsernameTaken(err)) throw new AppError('USERNAME_TAKEN');
+      throw err;
+    });
+    return this.authResponse(user);
   }
 
   // Rotates the presented refresh token and returns a new access token and refresh token.

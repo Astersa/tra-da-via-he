@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { Algorithm, hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
+import { hash as argonHash, verify as argonVerify, type Algorithm } from '@node-rs/argon2';
+
+// Argon2id = 2 in @node-rs/argon2 (const enum, unusable under isolatedModules).
+const ARGON2ID = 2 as Algorithm;
 
 // Parameters from IMPLEMENTATION-PLAN.md §3.10.7. Do not change without a security decision.
 export const ARGON2_OPTIONS = {
-  algorithm: Algorithm.Argon2id,
+  algorithm: ARGON2ID,
   memoryCost: 19456,
   timeCost: 2,
   parallelism: 1,

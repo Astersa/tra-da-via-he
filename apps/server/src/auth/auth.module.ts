@@ -7,6 +7,7 @@ import { AuthService } from './auth.service.js';
 import { JWT_SECRET, readJwtSecret } from './jwt.js';
 import { IpRateLimitGuard, RATE_LIMITER } from './ip-rate-limit.guard.js';
 import { PasswordService } from './password.service.js';
+import { RefreshTokenService } from './refresh-token.service.js';
 
 @Module({
   imports: [UsersModule],
@@ -14,6 +15,7 @@ import { PasswordService } from './password.service.js';
   providers: [
     AuthService,
     PasswordService,
+    RefreshTokenService,
     IpRateLimitGuard,
     // Factories, not values: each app instance gets its own limiter (process-local state, §3.9).
     { provide: RATE_LIMITER, useFactory: () => new InMemoryRateLimiter() },

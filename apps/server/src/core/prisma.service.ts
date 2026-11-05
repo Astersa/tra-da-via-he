@@ -1,6 +1,7 @@
-import { Injectable, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, type OnApplicationShutdown, type OnModuleInit } from '@nestjs/common';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
+import { waitForIdleTx } from './tx.js';
 
 export const DEFAULT_DB_POOL_MAX = 5;
 
@@ -13,7 +14,9 @@ export function readPoolMax(env: NodeJS.ProcessEnv = process.env): number {
 }
 
 @Injectable()
-export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
+export class PrismaService extends PrismaClient implements OnModuleInit, OnApplicationShutdown {
+  private readonly logger = new Logger('PrismaService');
+
   constructor() {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) throw new Error('DATABASE_URL is not set');
@@ -24,7 +27,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     await this.$connect();
   }
 
-  async onModuleDestroy(): Promise<void> {
+  // Runs after the HTTP server has closed. Waits for withTx calls in flight (§3.10.4), then disconnects.
+  // A timeout is logged and the disconnect still happens: shutdown never throws from here.
+  async onApplicationShutdown(): Promise<void> {
+    if (!(await waitForIdleTx())) {
+      this.logger.warn('shutdown: transactions still running after the wait; disconnecting anyway');
+    }
     await this.$disconnect();
   }
 }

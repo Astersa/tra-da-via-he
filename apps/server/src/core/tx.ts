@@ -19,8 +19,48 @@ export function pgCode(err: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined;
 }
 
+// Transactions started by withTx that have not finished (retries included). Shutdown waits on it (§3.10.4).
+let activeTx = 0;
+let idleWaiters: (() => void)[] = [];
+
+// Resolves true once no withTx call is running, false after timeoutMs. Does not hold the process open.
+export function waitForIdleTx(timeoutMs = 8000): Promise<boolean> {
+  if (activeTx === 0) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onIdle = (): void => {
+      if (timer) clearTimeout(timer);
+      resolve(true);
+    };
+    timer = setTimeout(() => {
+      idleWaiters = idleWaiters.filter((w) => w !== onIdle);
+      resolve(false);
+    }, timeoutMs);
+    timer.unref?.();
+    idleWaiters.push(onIdle);
+  });
+}
+
 // The only place in the application that calls prisma.$transaction (checked by check:money).
 export async function withTx<T>(
+  prisma: PrismaClient,
+  fn: (tx: Tx) => Promise<T>,
+  opts?: TxOptions,
+): Promise<T> {
+  activeTx++;
+  try {
+    return await runWithRetries(prisma, fn, opts);
+  } finally {
+    activeTx--;
+    if (activeTx === 0) {
+      const waiters = idleWaiters;
+      idleWaiters = [];
+      for (const w of waiters) w();
+    }
+  }
+}
+
+async function runWithRetries<T>(
   prisma: PrismaClient,
   fn: (tx: Tx) => Promise<T>,
   opts?: TxOptions,

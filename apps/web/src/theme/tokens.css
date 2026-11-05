@@ -1,0 +1,22 @@
+:root {
+  --brown-900: #482818;
+  --logo-gold: #F8B838;
+  --logo-gold-light: #F8C858;
+  --tea: #E88808;
+  --wood-sign: #F8B868;
+  --wood-500: #C88848;
+  --awning-orange: #F89848;
+  --awning-cream: #F8D8A8;
+  --panel: #F8E8D8;
+  --stool-blue: #7888C8;
+  --stool-red: #D86868;
+  --stool-orange: #C87848;
+  --tree: #789868;
+  --leaf-light: #A8B858;
+  --leaf-dark: #283838;
+  --pavement: #D8A878;
+  --chalk: #685858;
+  --sky: #88C8F8;
+  --danger: #B23A3A;
+  --success: #2F6B3A;
+}

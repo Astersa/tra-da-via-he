@@ -1,0 +1,442 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  PLAYER
+  ADMIN
+}
+
+enum UserKind {
+  GUEST
+  REGISTERED
+}
+
+enum GameServerStatus {
+  PROVISIONING
+  ACTIVE
+  DRAINING
+  CLOSED
+}
+
+enum SessionStatus {
+  ACTIVE
+  ENDED
+}
+
+enum SessionEndReason {
+  LEFT
+  SWITCHED
+  REPLACED
+  GRACE_EXPIRED
+  SERVER_RESTART
+  KICKED
+}
+
+enum PlotKind {
+  RESERVED_DEFAULT
+  PURCHASABLE
+}
+
+enum ShopType {
+  DEFAULT
+  PLAYER_OWNED
+}
+
+enum ShopStatus {
+  OPEN
+  PAUSED
+  CLOSED
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  RESIGNED
+  TERMINATED
+  DAILY_RESET
+}
+
+enum ApplicationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  EXPIRED
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED
+  COMPLETED
+  CANCELLED
+  REJECTED
+  EXPIRED
+}
+
+enum WalletTxType {
+  STARTER_GRANT
+  DAILY_TOPUP
+  ORDER_HOLD
+  ORDER_HOLD_RELEASE
+  ORDER_CAPTURE
+  COMMISSION_EARNED
+  SHOP_OPEN_FEE
+  TREASURY_WITHDRAWAL
+  ADMIN_ADJUST
+}
+
+enum ShopTxType {
+  ORDER_REVENUE
+  SUPPLY_COST
+  COMMISSION_PAID
+  WITHDRAWAL
+  WITHDRAWAL_FEE
+}
+
+// ---------- Global ----------
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  kind         UserKind  @default(GUEST)
+  username     String?   @unique // luôn lưu lowercase; null với GUEST
+  passwordHash String? // null với GUEST
+  role         UserRole  @default(PLAYER)
+  mutedUntil   DateTime?
+  bannedAt     DateTime?
+  createdAt    DateTime  @default(now())
+
+  profile       PlayerProfile?
+  wallet        Wallet?
+  refreshTokens RefreshToken[]
+  sessions      ServerSession[]
+  ownedShops    Shop[]                @relation("ShopOwner")
+  employments   ShopEmployee[]
+  applications  EmployeeApplication[]
+  ordersPlaced  ShopOrder[]           @relation("OrderCustomer")
+  ordersHandled ShopOrder[]           @relation("OrderHandler")
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique // sha256 của token, không lưu token thô
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?   @db.Uuid
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PlayerProfile {
+  userId         String   @id @db.Uuid
+  displayName    String   @db.VarChar(20)
+  displayNameKey String   @unique // NFC + lowercase + bỏ dấu + bỏ khoảng trắng; chống trùng/giả mạo tên
+  avatarId       String   @default("avatar_01")
+  updatedAt      DateTime @updatedAt
+  user           User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+}
+
+model Wallet {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @db.Uuid
+  balance     BigInt   @default(0)
+  heldBalance BigInt   @default(0)
+  version     Int      @default(0) // tăng mỗi lần ghi; client bỏ wallet:updated cũ hơn
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  entries     WalletTransaction[]
+}
+
+model WalletTransaction {
+  id             BigInt       @id @default(autoincrement())
+  walletId       String       @db.Uuid
+  type           WalletTxType
+  amountDelta    BigInt // có dấu, thay đổi balance
+  heldDelta      BigInt       @default(0) // có dấu, thay đổi heldBalance
+  balanceAfter   BigInt
+  heldAfter      BigInt
+  idempotencyKey String       @unique // khóa tất định, xem §3.6
+  txGroupId      String       @db.Uuid // gom các bút toán cùng một thao tác
+  refType        String
+  refId          String
+  serverId       String?      @db.Uuid
+  shopId         String?      @db.Uuid
+  createdAt      DateTime     @default(now())
+  wallet         Wallet       @relation(fields: [walletId], references: [id], onDelete: Restrict)
+
+  @@index([walletId, id(sort: Desc)])
+  @@index([refType, refId])
+  @@index([type, createdAt])
+}
+
+model IdempotencyRecord {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @db.Uuid
+  scope        String // "order:create" | "plot:purchase" | "treasury:withdraw"
+  key          String   @db.Uuid // clientOpId do client sinh
+  requestHash  String // sha256 payload đã chuẩn hóa
+  responseJson Json?
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, scope, key])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  actorUserId String?  @db.Uuid // null = hệ thống
+  action      String
+  targetType  String
+  targetId    String
+  serverId    String?  @db.Uuid
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
+}
+
+model ChatReport {
+  id             String    @id @default(uuid()) @db.Uuid
+  reporterId     String    @db.Uuid
+  reportedUserId String    @db.Uuid
+  serverId       String    @db.Uuid
+  messageId      String    @db.Uuid
+  messageText    String    @db.VarChar(200) // chat không lưu DB nên snapshot từ ring buffer server
+  reason         String    @db.VarChar(200)
+  resolvedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@unique([reporterId, messageId])
+  @@index([resolvedAt, createdAt])
+}
+
+// ---------- Server / world ----------
+model WorldMap {
+  id        String       @id // "street-01"
+  version   Int
+  servers   GameServer[]
+}
+
+model GameServer {
+  id         String           @id @default(uuid()) @db.Uuid
+  slug       String           @unique
+  name       String
+  status     GameServerStatus @default(PROVISIONING)
+  softCap    Int              @default(15)
+  hardCap    Int              @default(25)
+  worldMapId String
+  createdAt  DateTime         @default(now())
+  worldMap   WorldMap         @relation(fields: [worldMapId], references: [id], onDelete: Restrict)
+  sessions   ServerSession[]
+  plots      ShopPlot[]
+  shops      Shop[]
+
+  @@index([status])
+}
+
+model ServerSession {
+  id        String            @id @default(uuid()) @db.Uuid
+  userId    String            @db.Uuid
+  serverId  String            @db.Uuid
+  status    SessionStatus     @default(ACTIVE)
+  endReason SessionEndReason?
+  lastX     Int?
+  lastY     Int?
+  startedAt DateTime          @default(now())
+  endedAt   DateTime?
+  user      User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  server    GameServer        @relation(fields: [serverId], references: [id], onDelete: Restrict)
+
+  @@index([serverId, status])
+  @@index([userId, startedAt(sort: Desc)])
+}
+
+model ShopPlot {
+  id       String     @id @default(uuid()) @db.Uuid
+  serverId String     @db.Uuid
+  mapSlot  String // khớp object "plot" trong map JSON: "D1".."D3", "P1".."P5"
+  kind     PlotKind
+  openFee  BigInt // 0 với RESERVED_DEFAULT
+  server   GameServer @relation(fields: [serverId], references: [id], onDelete: Restrict)
+  shops    Shop[]
+
+  @@unique([id, serverId])
+  @@unique([serverId, mapSlot])
+}
+
+// ---------- Business ----------
+model Shop {
+  id           String                @id @default(uuid()) @db.Uuid
+  serverId     String                @db.Uuid
+  plotId       String                @db.Uuid
+  type         ShopType
+  defaultSlot  Int?
+  ownerId      String?               @db.Uuid
+  name         String                @db.VarChar(30)
+  status       ShopStatus            @default(OPEN)
+  isHiring     Boolean               @default(true)
+  closedAt     DateTime?
+  createdAt    DateTime              @default(now())
+  server       GameServer            @relation(fields: [serverId], references: [id], onDelete: Restrict)
+  plot         ShopPlot              @relation(fields: [plotId, serverId], references: [id, serverId], onDelete: Restrict)
+  owner        User?                 @relation("ShopOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  treasury     ShopTreasury?
+  menu         ShopMenu[]
+  employees    ShopEmployee[]
+  applications EmployeeApplication[]
+  orders       ShopOrder[]
+
+  @@unique([id, serverId])
+  @@index([serverId, status])
+}
+
+model ShopTreasury {
+  id        String            @id @default(uuid()) @db.Uuid
+  shopId    String            @unique @db.Uuid
+  balance   BigInt            @default(0)
+  version   Int               @default(0)
+  updatedAt DateTime          @updatedAt
+  shop      Shop              @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  entries   ShopTransaction[]
+}
+
+model ShopTransaction {
+  id             BigInt       @id @default(autoincrement())
+  treasuryId     String       @db.Uuid
+  type           ShopTxType
+  amountDelta    BigInt
+  balanceAfter   BigInt
+  idempotencyKey String       @unique
+  txGroupId      String       @db.Uuid
+  refType        String
+  refId          String
+  serverId       String       @db.Uuid
+  createdAt      DateTime     @default(now())
+  treasury       ShopTreasury @relation(fields: [treasuryId], references: [id], onDelete: Restrict)
+
+  @@index([treasuryId, id(sort: Desc)])
+  @@index([refType, refId])
+  @@index([type, createdAt])
+}
+
+model ShopEmployee {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  shopId    String           @db.Uuid
+  serverId  String           @db.Uuid
+  status    EmploymentStatus @default(ACTIVE)
+  hiredAt   DateTime         @default(now())
+  endedAt   DateTime?
+  endedById String?          @db.Uuid
+  endReason String?
+  user      User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  shop      Shop             @relation(fields: [shopId, serverId], references: [id, serverId], onDelete: Restrict)
+
+  @@index([shopId, status])
+  @@index([userId, hiredAt(sort: Desc)])
+}
+
+model EmployeeApplication {
+  id          String            @id @default(uuid()) @db.Uuid
+  userId      String            @db.Uuid
+  shopId      String            @db.Uuid
+  serverId    String            @db.Uuid
+  status      ApplicationStatus @default(PENDING)
+  message     String?           @db.VarChar(200)
+  decidedById String?           @db.Uuid // null + decidedAt != null = hệ thống tự duyệt
+  decidedAt   DateTime?
+  createdAt   DateTime          @default(now())
+  user        User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  shop        Shop              @relation(fields: [shopId, serverId], references: [id, serverId], onDelete: Restrict)
+
+  @@index([shopId, status])
+  @@index([userId, status])
+}
+
+model Product {
+  id           String          @id // "tra-da", "tra-chanh", ...
+  name         String
+  supplyCost   BigInt
+  minPrice     BigInt
+  maxPrice     BigInt
+  defaultPrice BigInt
+  menu         ShopMenu[]
+  orderItems   ShopOrderItem[]
+}
+
+model ShopMenu {
+  id        String   @id @default(uuid()) @db.Uuid
+  shopId    String   @db.Uuid
+  productId String
+  price     BigInt
+  isActive  Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  shop      Shop     @relation(fields: [shopId], references: [id], onDelete: Restrict)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([shopId, productId])
+}
+
+model ShopOrder {
+  id                    String           @id @default(uuid()) @db.Uuid
+  serverId              String           @db.Uuid
+  shopId                String           @db.Uuid
+  customerId            String           @db.Uuid
+  handlerId             String?          @db.Uuid
+  ownerIdSnapshot       String?          @db.Uuid // để CHECK chống tự mua; null với quán DEFAULT
+  status                OrderStatus      @default(PENDING)
+  totalAmount           BigInt
+  supplyCostTotal       BigInt
+  commissionBpsSnapshot Int
+  commissionAmount      BigInt? // chỉ có khi COMPLETED
+  profitAmount          BigInt? // chỉ có khi COMPLETED
+  version               Int              @default(0)
+  expiresAt             DateTime // hạn cứng của đơn
+  acceptedAt            DateTime?
+  acceptExpiresAt       DateTime?
+  closedAt              DateTime?
+  closeReason           String?
+  createdAt             DateTime         @default(now())
+  shop                  Shop             @relation(fields: [shopId, serverId], references: [id, serverId], onDelete: Restrict)
+  customer              User             @relation("OrderCustomer", fields: [customerId], references: [id], onDelete: Restrict)
+  handler               User?            @relation("OrderHandler", fields: [handlerId], references: [id], onDelete: Restrict)
+  items                 ShopOrderItem[]
+  events                ShopOrderEvent[]
+
+  @@index([customerId, status])
+  @@index([customerId, handlerId, closedAt])
+}
+
+model ShopOrderItem {
+  id                     String    @id @default(uuid()) @db.Uuid
+  orderId                String    @db.Uuid
+  productId              String
+  productNameSnapshot    String
+  unitPriceSnapshot      BigInt
+  unitSupplyCostSnapshot BigInt
+  quantity               Int
+  order                  ShopOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  product                Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@unique([orderId, productId])
+}
+
+model ShopOrderEvent {
+  id          BigInt       @id @default(autoincrement())
+  orderId     String       @db.Uuid
+  fromStatus  OrderStatus?
+  toStatus    OrderStatus
+  actorUserId String?      @db.Uuid // null = hệ thống (sweeper)
+  reason      String
+  createdAt   DateTime     @default(now())
+  order       ShopOrder    @relation(fields: [orderId], references: [id], onDelete: Restrict)
+
+  @@index([orderId, id])
+}

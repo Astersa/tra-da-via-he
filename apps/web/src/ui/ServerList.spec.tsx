@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setAccessToken } from '../api/client';
 import { useServerStore } from '../store/serverStore';
+import { useWorldStore } from '../store/worldStore';
 import { ServerList } from './ServerList';
 
 const SERVER_A = {
@@ -59,6 +60,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  useWorldStore.getState().disconnectWorld();
 });
 
 describe('màn chọn server', () => {
@@ -100,7 +102,7 @@ describe('màn chọn server', () => {
     expect(count(fetchMock, '/servers/quick-join')).toBe(1);
     const join = fetchMock.mock.calls.find(([url]) => String(url).endsWith('/servers/quick-join'))!;
     expect((join[1] as RequestInit).method).toBe('POST');
-    expect(await screen.findByText(/Màn game sẽ mở ở bước sau/)).toBeTruthy();
+    expect(useWorldStore.getState().serverId).toBe(SERVER_B.id);
   });
 
   it('nút Vào máy chủ này lưu đúng serverId của thẻ đã chọn', async () => {
@@ -111,7 +113,7 @@ describe('màn chọn server', () => {
     fireEvent.click(within(card).getByRole('button', { name: 'Vào máy chủ này' }));
 
     expect(useServerStore.getState().serverId).toBe(SERVER_B.id);
-    expect(await screen.findByText('Đã chọn Ngõ Nhỏ. Màn game sẽ mở ở bước sau.')).toBeTruthy();
+    expect(useWorldStore.getState().serverId).toBe(SERVER_B.id);
   });
 
   it('SERVER_FULL từ quick join hiện đúng thông báo tiếng Việt', async () => {

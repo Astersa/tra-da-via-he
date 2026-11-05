@@ -1,0 +1,45 @@
+.game-screen {
+  position: fixed;
+  inset: 0;
+  background: var(--pavement, #d8a878);
+  overflow: hidden;
+}
+
+.game-host {
+  position: absolute;
+  inset: 0;
+}
+
+.game-host canvas {
+  display: block;
+}
+
+.game-overlay {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border: 3px solid var(--brown-900, #482818);
+  border-radius: 16px;
+  background: var(--panel, #f8e8d8);
+  color: var(--brown-900, #482818);
+  text-align: center;
+  pointer-events: auto;
+}
+
+.game-overlay p {
+  margin: 0 0 8px;
+}
+
+.game-overlay-button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 2px solid var(--brown-900, #482818);
+  border-radius: 12px;
+  background: var(--awning-orange, #f89848);
+  color: var(--brown-900, #482818);
+  font: inherit;
+  cursor: pointer;
+}

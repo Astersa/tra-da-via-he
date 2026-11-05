@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useServerStore, type ServerCard } from '../store/serverStore';
+import { useWorldStore } from '../store/worldStore';
 import { Button, Panel } from './components';
 import { errorTextFor } from './errorText';
 import './ServerList.css';
@@ -57,17 +58,27 @@ export function ServerList() {
   const listError = useServerStore((s) => s.listError);
   const joining = useServerStore((s) => s.joining);
   const joinError = useServerStore((s) => s.joinError);
-  const serverId = useServerStore((s) => s.serverId);
   const loadServers = useServerStore((s) => s.loadServers);
   const quickJoin = useServerStore((s) => s.quickJoin);
   const selectServer = useServerStore((s) => s.selectServer);
+  const connect = useWorldStore((s) => s.connect);
 
   useEffect(() => {
     void loadServers();
   }, [loadServers]);
 
-  const selected = serverId ? servers?.find((s) => s.id === serverId) : undefined;
   const busy = joining;
+
+  // Chọn máy chủ thì nối world; App sẽ chuyển sang màn chơi.
+  const onSelect = (id: string) => {
+    selectServer(id);
+    connect(id);
+  };
+  const onQuickJoin = async () => {
+    await quickJoin();
+    const id = useServerStore.getState().serverId;
+    if (id) connect(id);
+  };
 
   let body;
   if (loading && servers === null) {
@@ -87,13 +98,13 @@ export function ServerList() {
     body = <p className="hint">Chưa có máy chủ nào đang mở.</p>;
   } else if (servers) {
     body = servers.map((server) => (
-      <ServerCardView key={server.id} server={server} disabled={busy} onSelect={selectServer} />
+      <ServerCardView key={server.id} server={server} disabled={busy} onSelect={onSelect} />
     ));
   }
 
   return (
     <Panel title="Chọn máy chủ">
-      <Button onClick={() => void quickJoin()} disabled={busy || !servers || servers.length === 0}>
+      <Button onClick={() => void onQuickJoin()} disabled={busy || !servers || servers.length === 0}>
         {joining ? 'Đang tìm...' : 'Vào nhanh (Quick Join)'}
       </Button>
       {joinError !== null && (
@@ -102,13 +113,6 @@ export function ServerList() {
         </p>
       )}
       {body}
-      {serverId && (
-        <section className="server-temp" aria-label="Vùng tạm">
-          <p role="status">
-            {selected ? `Đã chọn ${selected.name}.` : 'Đã chọn máy chủ.'} Màn game sẽ mở ở bước sau.
-          </p>
-        </section>
-      )}
       <p className="hint">Số người online sẽ tự cập nhật khi đã kết nối tới máy chủ.</p>
     </Panel>
   );

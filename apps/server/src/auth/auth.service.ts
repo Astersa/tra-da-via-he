@@ -6,6 +6,7 @@ import { CLOCK, startOfVnDay, type Clock } from '../core/clock.js';
 import { AppError } from '../core/errors.js';
 import { GAME_CONFIG, type GameConfig } from '../core/game-config.js';
 import { PrismaService } from '../core/prisma.service.js';
+import { REALTIME_PUBLISHER, type RealtimePublisher } from '../core/realtime-publisher.js';
 import { pgCode, withTx } from '../core/tx.js';
 import { UsersService } from '../users/users.service.js';
 import { PasswordService } from './password.service.js';
@@ -40,6 +41,7 @@ export class AuthService {
     @Inject(GAME_CONFIG) private readonly config: GameConfig,
     @Inject(JWT_SECRET) private readonly secret: string,
     private readonly refreshTokens: RefreshTokenService,
+    @Inject(REALTIME_PUBLISHER) private readonly realtime: RealtimePublisher,
   ) {}
 
   // ipHash = sha256(ip + ':' + JWT_SECRET). The raw IP is never stored (§3.6.4).
@@ -118,8 +120,11 @@ export class AuthService {
     return { auth: { accessToken: await signAccessToken(this.secret, next.userId) }, refresh: next };
   }
 
-  logout(raw: string | undefined): Promise<void> {
-    return raw ? this.refreshTokens.revoke(raw) : Promise.resolve();
+  // Revokes the refresh token, then drops the user's realtime sockets (M1-E3-T2).
+  async logout(raw: string | undefined): Promise<void> {
+    if (!raw) return;
+    const userId = await this.refreshTokens.revoke(raw);
+    if (userId) this.realtime.disconnectUser(userId, 'LOGOUT');
   }
 
   private async authResponse(user: {

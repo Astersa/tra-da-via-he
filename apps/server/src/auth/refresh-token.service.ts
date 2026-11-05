@@ -129,11 +129,15 @@ export class RefreshTokenService {
   }
 
   // Logout revokes the presented token. An unknown or already revoked token is a no-op.
-  async revoke(raw: string): Promise<void> {
+  // Returns the owner's userId when the token exists, so the caller can disconnect that user.
+  async revoke(raw: string): Promise<string | undefined> {
+    const hash = hashRefreshToken(raw);
+    const row = await this.prisma.refreshToken.findUnique({ where: { tokenHash: hash }, select: { userId: true } });
     await this.prisma.refreshToken.updateMany({
-      where: { tokenHash: hashRefreshToken(raw), revokedAt: null },
+      where: { tokenHash: hash, revokedAt: null },
       data: { revokedAt: this.clock.now() },
     });
+    return row?.userId;
   }
 
 }

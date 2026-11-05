@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger, type BeforeApplicationShutdown } from '@nestjs/common';
 import { OnGatewayConnection, OnGatewayInit, WebSocketGateway } from '@nestjs/websockets';
 import { ClientEventSchemas, type Ack, type ClientEvent } from '@tdvh/shared';
 import type { Server, Socket } from 'socket.io';
@@ -9,8 +9,9 @@ import { SocketRealtimePublisher } from './socket-realtime-publisher.js';
 
 // Connection: auth in middleware, then lobby and user rooms. Each client event goes through EventPipeline.
 @WebSocketGateway()
-export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
+export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection, BeforeApplicationShutdown {
   private readonly logger = new Logger('RealtimeGateway');
+  private server?: Server;
 
   constructor(
     private readonly auth: SocketAuth,
@@ -20,8 +21,15 @@ export class RealtimeGateway implements OnGatewayInit, OnGatewayConnection {
   ) {}
 
   afterInit(server: Server): void {
+    this.server = server;
     server.use(this.auth.middleware());
     this.publisher.attach(server);
+  }
+
+  // IMPLEMENTATION-PLAN.md §3.10.4. io.close() (not disconnectSockets) so clients see "transport close" and reconnect.
+  // Session rows in the DB are left as they are: the next boot ends them (order 10).
+  async beforeApplicationShutdown(): Promise<void> {
+    await this.server?.close();
   }
 
   handleConnection(client: Socket): void {

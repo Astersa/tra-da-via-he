@@ -1,7 +1,7 @@
 import { createServer, type AddressInfo } from 'node:net';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import type { Ack } from '@tdvh/shared';
+import { displayNameKey, type Ack } from '@tdvh/shared';
 import { io as connect, type Socket as ClientSocket } from 'socket.io-client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../../src/app.module.js';
@@ -9,9 +9,22 @@ import { configureApp, startApp } from '../../src/app.setup.js';
 import { BootTasks } from '../../src/core/boot-tasks.js';
 import { signAccessToken } from '../../src/core/jwt.js';
 import { PrismaService } from '../../src/core/prisma.service.js';
-import { withTx } from '../../src/core/tx.js';
+import { waitForIdleTx, withTx } from '../../src/core/tx.js';
 import { ReconnectService } from '../../src/session/reconnect.service.js';
 import { resetDb, seedDefaultShop, seedPlot, seedProduct, seedServer, seedUser, testPrisma } from '../helpers/db.js';
+
+// A player as users.service creates them: user, wallet and profile. world:join reads all three.
+function seedPlayer(name: string) {
+  return testPrisma.user.create({
+    data: {
+      kind: 'REGISTERED',
+      username: name,
+      passwordHash: 'test-hash',
+      wallet: { create: { balance: 0n } },
+      profile: { create: { displayName: name, displayNameKey: displayNameKey(name), avatarId: 'avatar_01' } },
+    },
+  });
+}
 
 // IMPLEMENTATION-PLAN.md §3.10.4, M1-E6-T1. Real HTTP, socket.io-client, PostgreSQL. No mocks.
 // Not covered here: SIGTERM itself (Windows limits it). The shutdown path is app.close(), which
@@ -127,7 +140,7 @@ describe('startApp: boot tasks and listen', () => {
 describe('shutdown (app.close)', () => {
   it('closes live sockets with a reason other than io server disconnect and keeps the session ACTIVE', async () => {
     const server = await activeServer();
-    const user = await seedUser();
+    const user = await seedPlayer('BootPlayer');
     const plot = await seedPlot(server.id, 'D1');
     await seedDefaultShop(server.id, plot.id, 1);
     const a = await build();
@@ -174,5 +187,51 @@ describe('shutdown (app.close)', () => {
     await inside;
     await a.close();
     await expect(running).resolves.toMatchObject({ id: user.id });
+  });
+});
+
+describe('withTx in-flight tracking (waitForIdleTx)', () => {
+  it('a running transaction keeps waitForIdleTx pending until it finishes', async () => {
+    const user = await seedUser();
+    let markInside!: () => void;
+    const inside = new Promise<void>((resolve) => (markInside = resolve));
+    const running = withTx(testPrisma, async (tx) => {
+      markInside();
+      await tx.$executeRaw`SELECT pg_sleep(0.3)`;
+      return tx.user.findUniqueOrThrow({ where: { id: user.id } });
+    });
+    await inside;
+    await expect(waitForIdleTx(50)).resolves.toBe(false);
+    await expect(running).resolves.toMatchObject({ id: user.id });
+    await expect(waitForIdleTx(50)).resolves.toBe(true);
+  });
+
+  it('the counter returns to zero when fn throws', async () => {
+    await expect(
+      withTx(testPrisma, async () => {
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+    await expect(waitForIdleTx(50)).resolves.toBe(true);
+  });
+
+  it('the counter returns to zero when retries run out', async () => {
+    const deadlock = Object.assign(new Error('deadlock'), {
+      meta: { driverAdapterError: { cause: { originalCode: '40P01' } } },
+    });
+    await expect(
+      withTx(
+        testPrisma,
+        async () => {
+          throw deadlock;
+        },
+        { maxRetries: 1 },
+      ),
+    ).rejects.toMatchObject({ code: 'INTERNAL_ERROR' });
+    await expect(waitForIdleTx(50)).resolves.toBe(true);
+  });
+
+  it('resolves true immediately when no transaction is running', async () => {
+    await expect(waitForIdleTx()).resolves.toBe(true);
   });
 });

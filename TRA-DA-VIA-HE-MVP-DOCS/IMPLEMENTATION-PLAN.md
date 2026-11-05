@@ -1067,6 +1067,8 @@ Dùng `FOR NO KEY UPDATE`, **không dùng `FOR UPDATE`**: khi thêm dòng con c�
 
 Session dùng `pg_advisory_xact_lock(hashtextextended('session:' || $userId, 0))` thay vì khóa dòng `User`, vì các transaction khác liên tục tham chiếu FK đến `User`.
 
+**Giới hạn người chơi:** `join` và `switchTo` lấy thêm `pg_advisory_xact_lock(hashtextextended('server-cap:' || $serverId, 0))` ngay trước khi đếm session của server đích, **sau** khóa session của user và chỉ khi sắp mở session mới. Một transaction chỉ giữ một khóa `server-cap`, không có đường nào lấy khóa session sau khóa này, nên không tạo deadlock. Không có khóa này thì hai user khác nhau cùng vào chỗ cuối sẽ vượt `hardCap`, mà `hardCap` là giới hạn thật trên 0.1 CPU.
+
 **Reset quán DEFAULT trong transaction `apply`.** `resetStaleDefaultEmployees` gồm hai phần tách biệt để không phá thứ tự khóa: `endStaleInTx` chỉ chạm L4, chạy trước khi đếm chỗ; `releaseEndedInTx` chạm L5, L6 (đơn và ví), chạy **sau** khi đã thêm application và `ShopEmployee` (L4). Nếu gọi `releaseHandlerOrders` trước khi tuyển thì transaction lấy L6 rồi quay lại L4, sai quy tắc trên. Xem §3.6.4.
 
 **Nhiều đơn trong một transaction.** `releaseHandlerOrders` khóa đơn theo `id` tăng dần; mỗi đơn quá hạn gọi `LedgerService.apply` riêng nên các ví không được sắp theo `userId`. Deadlock hiếm ở nhánh này do `withTx` retry; đây là giới hạn đã biết, không tự sửa.

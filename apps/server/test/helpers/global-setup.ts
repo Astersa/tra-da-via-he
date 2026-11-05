@@ -8,7 +8,7 @@ const serverDir = fileURLToPath(new URL('../../', import.meta.url));
 export default function setup(): void {
   process.loadEnvFile(fileURLToPath(new URL('../../.env.test', import.meta.url)));
   const url = process.env.DATABASE_URL ?? '';
-  if (!/localhost:5433\/tdvh_test$/.test(url)) {
+  if (!url.endsWith('localhost:5433/tdvh_test')) {
     throw new Error(`Refusing to migrate: DATABASE_URL is not the test DB (port 5433): ${url}`);
   }
   const res = spawnSync(

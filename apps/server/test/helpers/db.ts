@@ -30,7 +30,7 @@ function errorText(err: unknown): string {
   let cur: unknown = err;
   for (let depth = 0; cur && depth < 5; depth++) {
     if (cur instanceof Error) {
-      parts.push(cur.message, safeJson({ ...cur }));
+      parts.push(cur.message, safeJson(Object.assign({}, cur)));
       cur = (cur as { cause?: unknown }).cause;
     } else {
       parts.push(safeJson(cur));

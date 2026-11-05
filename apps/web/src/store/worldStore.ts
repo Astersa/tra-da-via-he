@@ -3,6 +3,7 @@ import {
   WorldStateSchema,
   type ChatMessage,
   type OrderView,
+  type PlayerMoveReq,
   type PlayerView,
   type ServerToClientEvents,
   type ShopSummary,
@@ -42,10 +43,15 @@ export interface WorldStore extends WorldData {
   sessionLost: boolean;
   replacedReason: 'NEW_TAB' | 'SWITCHED' | null;
   error: { code: string; message: string } | null;
+  // Tăng mỗi lần vị trí của mình được đặt lại từ server (world:state hoặc player:moved corrected).
+  // Game dùng để biết khi nào phải về vị trí server; đi bình thường không đổi giá trị này.
+  positionSync: number;
   // Nối socket và gọi world:join cho server này.
   connect: (serverId: string) => void;
   // Ngắt socket, dừng mọi timer, xóa world store và sessionStorage.
   disconnectWorld: () => void;
+  // Gửi player:move (không ack). false nếu chưa joined, đang ngồi, hoặc socket chưa nối.
+  sendMove: (req: PlayerMoveReq) => boolean;
 }
 
 const EMPTY_DATA: WorldData = {
@@ -69,6 +75,7 @@ const INITIAL = {
   sessionLost: false,
   replacedReason: null as WorldStore['replacedReason'],
   error: null as WorldStore['error'],
+  positionSync: 0,
 };
 
 const MAX_CHAT = 50;
@@ -99,6 +106,14 @@ export const useWorldStore = create<WorldStore>()((set) => ({
   },
 
   disconnectWorld: () => disconnectWorld(),
+
+  sendMove: (req) => {
+    const st = useWorldStore.getState();
+    const s = activeSocket;
+    if (!s || !s.connected || st.status !== 'joined' || !st.self || st.self.seatId) return false;
+    s.emit('player:move', req);
+    return true;
+  },
 }));
 
 // Đăng xuất (token về null) hoặc refresh thất bại: ngắt world.
@@ -296,10 +311,14 @@ function bindSocket(s: TypedSocket): void {
     let self = st.self;
     const players = { ...st.players };
     let playersChanged = false;
+    let positionChanged = false;
     for (const m of evt.moves) {
       if (m.userId === self.userId) {
         // Với mình chỉ áp dụng bản bị server sửa (corrected).
-        if (m.corrected) self = { ...self, x: m.x, y: m.y, dir: m.dir };
+        if (m.corrected) {
+          self = { ...self, x: m.x, y: m.y, dir: m.dir };
+          positionChanged = true;
+        }
         continue;
       }
       const prev = players[m.userId];
@@ -311,7 +330,11 @@ function bindSocket(s: TypedSocket): void {
     }
     // Một lần set cho cả batch, không set theo từng move.
     if (self !== st.self || playersChanged) {
-      setWorld({ self, players: playersChanged ? players : st.players });
+      setWorld({
+        self,
+        players: playersChanged ? players : st.players,
+        positionSync: positionChanged ? st.positionSync + 1 : st.positionSync,
+      });
     }
   });
   listen(s, 'player:interacted', (evt) => {
@@ -369,6 +392,7 @@ function listen<K extends keyof ServerToClientEvents>(
 function applyWorldState(ws: WorldState): void {
   lastSeq.clear();
   setWorld({
+    positionSync: useWorldStore.getState().positionSync + 1,
     sessionId: ws.sessionId,
     serverId: ws.serverId,
     self: ws.self,

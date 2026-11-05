@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { BootScene } from './BootScene';
+import { PreloadScene } from './PreloadScene';
+import { WorldScene } from './WorldScene';
 
 export function createGame(parent: HTMLElement): Phaser.Game {
   return new Phaser.Game({
@@ -7,10 +8,11 @@ export function createGame(parent: HTMLElement): Phaser.Game {
     parent,
     width: 960,
     height: 540,
+    backgroundColor: '#d8a878',
     scale: {
       mode: Phaser.Scale.FIT,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [BootScene],
+    scene: [PreloadScene, WorldScene],
   });
 }

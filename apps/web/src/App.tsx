@@ -1,7 +1,12 @@
 import { AuthGate } from './ui/AuthGate';
+import { GameView } from './game/GameView';
+import { useWorldStore } from './store/worldStore';
 import './ui/ui.css';
 
-// Game (Phaser) chưa được mount ở task này; M1-E5-T4 sẽ mount lại sau khi vào quán.
+// Chưa vào máy chủ thì hiện màn vào (AuthGate). Đã chọn máy chủ (worldStore.connect) thì hiện màn chơi.
+// App không nằm trong ui hay game nên được import cả hai (§3.1).
 export function App() {
-  return <AuthGate />;
+  const status = useWorldStore((s) => s.status);
+  if (status === 'idle') return <AuthGate />;
+  return <GameView />;
 }

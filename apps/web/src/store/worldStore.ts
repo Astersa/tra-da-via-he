@@ -169,7 +169,11 @@ async function switchAction(targetServerId: string): Promise<boolean> {
   const res = await emitAck(s, 'server:switch', { targetServerId }, { timeoutMs: ACTION_TIMEOUT_MS, retries: 0 });
   if (!isCurrent(s)) return false;
   if (!res.ok) {
-    setWorld({ switching: false, switchError: new ApiError(res.error.code as ClientErrorCode, res.error.message, 409) });
+    // Hết giờ (hoặc lỗi nội bộ có thể thử lại): server có thể đã chuyển, nên hỏi lại trạng thái thật.
+    if (res.error.code === 'INTERNAL_ERROR' && res.error.retryable) {
+      return resolveUnconfirmedSwitch(s, targetServerId, res.error);
+    }
+    setWorld({ switching: false, switchError: switchApiError(res.error) });
     return false;
   }
   const parsed = WorldStateSchema.safeParse(res.data);
@@ -178,10 +182,47 @@ async function switchAction(targetServerId: string): Promise<boolean> {
     failWorld('INTERNAL_ERROR', 'Phản hồi không hợp lệ');
     return false;
   }
-  applyWorldState(parsed.data);
-  setWorld({ switching: false });
-  saveResume(parsed.data.serverId, parsed.data.sessionId);
+  commitSwitch(parsed.data);
   return true;
+}
+
+// Sau server:switch không rõ kết quả: world:resync cho biết server hiện tại.
+// Đích: coi là đã chuyển, không hiện lỗi. Cũ: giữ nguyên và hiện lỗi gốc. Resync cũng lỗi: giữ switchError, luồng reconnect xử lý.
+async function resolveUnconfirmedSwitch(
+  s: TypedSocket,
+  targetServerId: string,
+  err: { code: string; message: string; retryable: boolean },
+): Promise<boolean> {
+  const res = await emitAck(s, 'world:resync', {}, { timeoutMs: ACTION_TIMEOUT_MS, retries: 0 });
+  if (!isCurrent(s)) return false;
+  if (!res.ok) {
+    setWorld({ switching: false, switchError: switchApiError(err) });
+    if (res.error.retryable) scheduleRetry(s);
+    return false;
+  }
+  const parsed = WorldStateSchema.safeParse(res.data);
+  if (!parsed.success) {
+    setWorld({ switching: false });
+    failWorld('INTERNAL_ERROR', 'Phản hồi không hợp lệ');
+    return false;
+  }
+  if (parsed.data.serverId === targetServerId) {
+    commitSwitch(parsed.data);
+    return true;
+  }
+  setWorld({ switching: false, switchError: switchApiError(err) });
+  return false;
+}
+
+// Thay state bằng WorldState của server mới, xóa lỗi chuyển và ghi bản lưu.
+function commitSwitch(ws: WorldState): void {
+  applyWorldState(ws);
+  setWorld({ switching: false, switchError: null });
+  saveResume(ws.serverId, ws.sessionId);
+}
+
+function switchApiError(err: { code: string; message: string }): ApiError {
+  return new ApiError(err.code as ClientErrorCode, err.message, 409);
 }
 
 // chat:send với clientMsgId do người gọi sinh. Không tự thử lại: gửi lại sẽ tạo yêu cầu mới.

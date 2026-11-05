@@ -577,6 +577,55 @@ describe('worldStore: đổi máy chủ (server:switch, M1-E5-T10)', () => {
     expect(fake.emitted.some((e) => e.event === 'server:switch')).toBe(false);
   });
 
+  it('server:switch hết giờ, resync báo đã ở server đích: coi là đã chuyển, không hiện lỗi', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().switchServer(TARGET);
+    fake.lastEmit('server:switch').ack?.({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'Hết thời gian chờ', retryable: true } });
+    await tick();
+    fake.lastEmit('world:resync').ack?.({
+      ok: true,
+      data: worldState({ serverId: TARGET, sessionId: SESSION_B, players: [] }),
+    });
+    await expect(p).resolves.toBe(true);
+    const st = useWorldStore.getState();
+    expect(st.serverId).toBe(TARGET);
+    expect(st.sessionId).toBe(SESSION_B);
+    expect(st.switching).toBe(false);
+    expect(st.switchError).toBeNull();
+    expect(JSON.parse(saved.get('tdvh.world') ?? '{}')).toEqual({ serverId: TARGET, sessionId: SESSION_B });
+  });
+
+  it('server:switch hết giờ, resync báo vẫn ở server cũ: giữ nguyên và hiện lỗi gốc', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().switchServer(TARGET);
+    fake.lastEmit('server:switch').ack?.({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'Hết thời gian chờ', retryable: true } });
+    await tick();
+    fake.lastEmit('world:resync').ack?.({ ok: true, data: worldState() });
+    await expect(p).resolves.toBe(false);
+    const st = useWorldStore.getState();
+    expect(st.serverId).toBe(SERVER);
+    expect(st.sessionId).toBe(SESSION);
+    expect(st.status).toBe('joined');
+    expect(st.switching).toBe(false);
+    expect(st.switchError).toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(JSON.parse(saved.get('tdvh.world') ?? '{}')).toEqual({ serverId: SERVER, sessionId: SESSION });
+  });
+
+  it('server:switch hết giờ, resync cũng lỗi: giữ switchError và để reconnect xử lý', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().switchServer(TARGET);
+    fake.lastEmit('server:switch').ack?.({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'Hết thời gian chờ', retryable: true } });
+    await tick();
+    fake.lastEmit('world:resync').ack?.({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'Hết thời gian chờ', retryable: true } });
+    await expect(p).resolves.toBe(false);
+    const st = useWorldStore.getState();
+    expect(st.switching).toBe(false);
+    expect(st.switchError).toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(st.serverId).toBe(SERVER);
+    // Lỗi có thể thử lại: luồng reconnect đặt lịch nối lại (trạng thái reconnecting).
+    expect(st.status).toBe('reconnecting');
+  });
+
   it('server:population cập nhật online trong danh sách máy chủ', async () => {
     useServerStore.setState({
       servers: [

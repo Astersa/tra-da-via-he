@@ -165,6 +165,8 @@ describe('vùng tạm sau khi vào', () => {
     });
     render(<AuthGate />);
     fireEvent.click(await screen.findByRole('button', { name: 'Đăng xuất' }));
+    // Khách phải xác nhận lại trước khi đăng xuất.
+    fireEvent.click(screen.getByRole('button', { name: 'Vẫn đăng xuất' }));
 
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Vào uống trà đá' })).toBeTruthy(),

@@ -1,0 +1,42 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tdvh
+          POSTGRES_PASSWORD: tdvh_test
+          POSTGRES_DB: tdvh_test
+        ports:
+          # Matches DATABASE_URL in apps/server/.env.test (localhost:5433).
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U tdvh -d tdvh_test"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify
+        run: pnpm verify

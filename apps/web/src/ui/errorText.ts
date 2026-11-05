@@ -63,6 +63,7 @@ export const NETWORK_ERROR_TEXT = 'Không kết nối được tới quán. Ki�
 
 // Chuyển lỗi thành câu tiếng Việt để hiện cho người chơi.
 export function errorTextFor(err: unknown): string {
-  if (err instanceof ApiError) return ERROR_TEXT[err.code];
+  // SERVICE_WAKING không có văn bản riêng: màn chờ (ColdStartScreen) thay cho thông báo lỗi.
+  if (err instanceof ApiError) return err.code === 'SERVICE_WAKING' ? NETWORK_ERROR_TEXT : ERROR_TEXT[err.code];
   return NETWORK_ERROR_TEXT;
 }

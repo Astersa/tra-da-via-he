@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { useConnectivityStore } from '../store/connectivityStore';
+import { ColdStartScreen } from './ColdStartScreen';
 import { LogoutButton } from './AccountBadge';
 import { Button, Panel } from './components';
 import { EntryScreen } from './EntryScreen';
@@ -12,11 +14,15 @@ export function AuthGate() {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const bootstrap = useAuthStore((s) => s.bootstrap);
+  const waking = useConnectivityStore((s) => s.status === 'waking');
   const [mode, setMode] = useState<'entry' | 'login'>('entry');
 
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
+
+  // Khi đã bỏ chờ (boot-error) thì để màn lỗi có nút "Thử lại" của bootstrap, không hiện màn chờ.
+  if (status !== 'boot-error' && waking) return <ColdStartScreen />;
 
   if (status === 'booting') {
     return (

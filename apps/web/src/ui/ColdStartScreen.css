@@ -1,0 +1,21 @@
+/* Chỉ dùng biến token từ theme/tokens.css (§3.8). Phủ toàn màn hình, không tràn ngang ở 390px. */
+.cold-start {
+  box-sizing: border-box;
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: var(--sky);
+  color: var(--brown-900);
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+  overflow-x: hidden;
+}
+
+.cold-start *,
+.cold-start *::before,
+.cold-start *::after {
+  box-sizing: border-box;
+}

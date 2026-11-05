@@ -1,6 +1,7 @@
 import type { GuestReq, LoginReq, UpgradeReq } from '@tdvh/shared';
 import { create } from 'zustand';
 import { authApi } from '../api/auth';
+import { waitUntilAwake } from '../api/awake';
 import type { ProfileView, UserView } from '../api/types';
 import {
   ApiError,
@@ -32,6 +33,43 @@ export interface AuthState {
   closeUpgrade: () => void;
   logout: () => Promise<void>;
   bootstrap: () => Promise<void>;
+}
+
+// Một lần bootstrap tại một thời điểm (StrictMode chạy effect hai lần; nhiều nơi gọi cùng lúc).
+let inflightBoot: Promise<void> | null = null;
+
+function runBootstrap(): Promise<void> {
+  if (!inflightBoot) {
+    inflightBoot = bootstrapOnce().finally(() => {
+      inflightBoot = null;
+    });
+  }
+  return inflightBoot;
+}
+
+// Chỉ 401 mới nghĩa là chưa đăng nhập. Gặp SERVICE_WAKING thì chờ service thức rồi thử lại, không về màn tạo khách (§3.10.6).
+async function bootstrapOnce(): Promise<void> {
+  useAuthStore.setState({ status: 'booting' });
+  for (;;) {
+    try {
+      const hasSession = await refreshSession(null);
+      if (!hasSession) {
+        useAuthStore.setState({ status: 'anonymous' });
+        return;
+      }
+      const me = await authApi.me();
+      useAuthStore.setState({ status: 'signed-in', user: me.user, profile: me.profile });
+      return;
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'UNAUTHENTICATED') {
+        useAuthStore.setState({ status: 'anonymous', user: null, profile: null });
+        return;
+      }
+      if (err instanceof ApiError && err.code === 'SERVICE_WAKING' && (await waitUntilAwake())) continue;
+      useAuthStore.setState({ status: 'boot-error' });
+      return;
+    }
+  }
 }
 
 export const useAuthStore = create<AuthState>()((set, get) => {
@@ -72,24 +110,7 @@ export const useAuthStore = create<AuthState>()((set, get) => {
       set({ status: 'anonymous', user: null, profile: null });
     },
 
-    bootstrap: async () => {
-      set({ status: 'booting' });
-      try {
-        const hasSession = await refreshSession(null);
-        if (!hasSession) {
-          set({ status: 'anonymous' });
-          return;
-        }
-        const me = await authApi.me();
-        set({ status: 'signed-in', user: me.user, profile: me.profile });
-      } catch (err) {
-        if (err instanceof ApiError && err.code === 'UNAUTHENTICATED') {
-          set({ status: 'anonymous', user: null, profile: null });
-        } else {
-          set({ status: 'boot-error' });
-        }
-      }
-    },
+    bootstrap: () => runBootstrap(),
   };
 });
 

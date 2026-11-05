@@ -199,6 +199,53 @@ describe("displayName", () => {
   });
 });
 
+describe("shopName 3..30 (sau trim)", () => {
+  const ok = (s: string) =>
+    rest.PurchasePlotReqSchema.safeParse({ shopName: s, clientOpId: UUID }).success;
+  it("độ dài 2 bị loại", () => {
+    expect(ok("ab")).toBe(false);
+  });
+  it("độ dài 3 được nhận", () => {
+    expect(ok("abc")).toBe(true);
+  });
+  it("độ dài 30 được nhận", () => {
+    expect(ok("a".repeat(30))).toBe(true);
+  });
+  it("độ dài 31 bị loại", () => {
+    expect(ok("a".repeat(31))).toBe(false);
+  });
+  it("PATCH shop dùng cùng giới hạn", () => {
+    expect(rest.PatchShopReqSchema.safeParse({ name: "ab" }).success).toBe(false);
+    expect(rest.PatchShopReqSchema.safeParse({ name: "a".repeat(31) }).success).toBe(false);
+    expect(rest.PatchShopReqSchema.safeParse({ name: "abc" }).success).toBe(true);
+  });
+});
+
+describe("login password 1..72", () => {
+  const login = (n: number) =>
+    rest.LoginReqSchema.safeParse({ email: "a@b.co", password: "x".repeat(n) }).success;
+  it("độ dài 1 được nhận", () => {
+    expect(login(1)).toBe(true);
+  });
+  it("độ dài 73 bị loại", () => {
+    expect(login(73)).toBe(false);
+  });
+});
+
+describe("limit từ query string", () => {
+  const limit = (v: string) => rest.ListWalletTransactionsReqSchema.safeParse({ limit: v });
+  it("\"10\" qua và thành số 10", () => {
+    const r = limit("10");
+    expect(r.success).toBe(true);
+    if (r.success) expect(r.data.limit).toBe(10);
+  });
+  it("\"0\", \"51\", \"abc\" bị loại", () => {
+    expect(limit("0").success).toBe(false);
+    expect(limit("51").success).toBe(false);
+    expect(limit("abc").success).toBe(false);
+  });
+});
+
 describe("avatarId", () => {
   it("chỉ nhận avatar_01..avatar_04", () => {
     expect(rest.AvatarIdSchema.safeParse("avatar_01").success).toBe(true);

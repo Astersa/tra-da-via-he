@@ -41,7 +41,7 @@ export const AvatarIdSchema = z.enum(["avatar_01", "avatar_02", "avatar_03", "av
 
 // Các giới hạn dưới đây KHÔNG có trong plan; chọn tạm và nêu trong báo cáo.
 export const ReasonSchema = z.string().trim().min(1).max(200);
-export const ShopNameSchema = z.string().trim().min(1).max(40);
+export const ShopNameSchema = z.string().trim().min(3).max(30);
 export const ServerSlugSchema = z.string().trim().min(1).max(40);
 export const ServerNameSchema = z.string().trim().min(1).max(40);
 
@@ -219,7 +219,10 @@ export const RegisterReqSchema = z
   })
   .strict();
 export const RegisterResSchema = z.object({ accessToken: z.string(), user: UserViewSchema }).strict();
-export const LoginReqSchema = z.object({ email: EmailSchema, password: PasswordSchema }).strict();
+// Login chỉ giới hạn trên để chặn payload lớn; mật khẩu sai trả INVALID_CREDENTIALS ở server.
+export const LoginReqSchema = z
+  .object({ email: EmailSchema, password: z.string().min(1).max(72) })
+  .strict();
 export const LoginResSchema = RegisterResSchema;
 export const RefreshResSchema = z.object({ accessToken: z.string() }).strict();
 

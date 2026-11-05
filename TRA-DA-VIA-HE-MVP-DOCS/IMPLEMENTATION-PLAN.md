@@ -10,7 +10,7 @@
 
 **Hiện trạng:** repo có toolchain, Docker Compose dev/test, CI, skeleton `apps/server` và `apps/web`, và contract `packages/shared` (`errors.ts`, `enums.ts`, `events.ts`, `rest.ts`). Chưa có Prisma schema, chưa có remote GitHub. Máy dev: Node 24.21.0, Docker 29.8.0, Windows.
 
-**Plan này gồm:** 7 milestone, 22 epic, 97 task (50 high-risk), tổ chức theo dependency thực. Khác baseline chủ yếu ở chỗ Economy Core đứng trước Order, và luồng hoàn tất đơn chỉ xuất hiện sau Employment (xem §4.2).
+**Plan này gồm:** 7 milestone, 22 epic, 98 task (50 high-risk), tổ chức theo dependency thực. Khác baseline chủ yếu ở chỗ Economy Core đứng trước Order, và luồng hoàn tất đơn chỉ xuất hiện sau Employment (xem §4.2).
 
 **Sáu điểm đáng đọc trước:**
 
@@ -1908,6 +1908,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 | M1-E5-T7 | E2E Playwright exit M1 | E5-T5, E5-T6, E5-T8, E5-T9 | M | | Haiku low |
 | M1-E5-T8 | Form tạo tài khoản, nút HUD, cảnh báo khách | E5-T1, E1-T4 | S | | Haiku low |
 | M1-E5-T9 | Cold start, `world:ping` giữ thức | E5-T1, E5-T3 | M | | Haiku low |
+| M1-E5-T10 | Nút chuyển server trong game | E5-T7 | S | | Haiku low |
 | M1-E6-T1 | Chạy sau proxy, `startApp`, tắt gọn | E3-T5 | M | HR | Haiku low + Opus review |
 | M1-E6-T2 | Phục vụ web cùng origin, CSP, bỏ CORS | E6-T1, E5-T7 | M | | Haiku low |
 | M1-E6-T3 | `render.yaml`, test khởi động lặp | E6-T2 | S | HR | Haiku low + Opus review |
@@ -2160,6 +2161,14 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Test:** 502 và body HTML đều vào `waking`; 401 không vào `waking`; refresh bị 503 thì **không** về `EntryScreen`, health đạt thì trở lại đúng phiên; `POST /auth/guest` bị 503 không tự gửi lại; quá 180 giây hiện nút "Thử lại"; socket nối lại xong thì màn chờ biến mất; `keepAwake` với timer giả: tab hiển thị gửi đúng chu kỳ, tab ẩn không gửi, socket ngắt không gửi.
 - **AC:** không có URL ngoài repo, không gọi pinger ngoài.
 - **Verify:** `pnpm --filter @tdvh/web exec vitest run src/api src/socket src/ui/ColdStartScreen src/store/connectivityStore`.
+
+#### M1-E5-T10 — Nút chuyển server trong game
+- **Đọc:** brief §3 "Chuyển server", §3.5.3, §3.4 dòng `server:switch`, `server:population`.
+- **Phạm vi:** `apps/web/src/ui/**`, `apps/web/src/store/{worldStore,serverStore}.ts`, `apps/web/src/App.tsx`, `apps/web/e2e/**`.
+- **Contract:** HUD có nút "Đổi máy chủ", mở danh sách server với số liệu như `ServerList`, không gồm server hiện tại. Chọn server gọi `server:switch` với `targetServerId`, thành công thì thay world state, Phaser hiện đúng người chơi của server mới và bản lưu `tdvh.world` đổi theo. Thất bại giữ nguyên server hiện tại và hiện lỗi qua `errorText`. Chặn gửi trùng. Danh sách cập nhật theo `server:population` khi có. Không chuyển tự động. Không có nút khi chỉ có một server thì ẩn lời mời và hiện "Chưa có máy chủ khác".
+- **Test:** store: thành công thay state; `SERVER_FULL` giữ nguyên; chặn gửi trùng. UI: mở, chọn, lỗi, rỗng. E2E hai trình duyệt, không dùng socket thủ công: A đổi sang server thứ hai, B ở server cũ thấy A biến mất, C ở server mới thấy A xuất hiện; A chat ở server mới, B không nhận.
+- **AC:** không để lại session ACTIVE cũ; F5 sau khi đổi quay lại server mới.
+- **Verify:** `pnpm --filter @tdvh/web exec vitest run src/ui src/store && pnpm e2e`.
 
 #### M1-E6-T1 — Chạy sau proxy, `startApp`, tắt gọn [HR]
 - **Đọc:** §3.10.2, §3.10.4; `apps/server/src/{main.ts,app.setup.ts}` hiện tại.

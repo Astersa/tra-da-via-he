@@ -6,8 +6,8 @@ import { SignJWT, UnsecuredJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AppModule } from '../../src/app.module.js';
 import { configureApp } from '../../src/app.setup.js';
-import { JwtGuard, Roles, RolesGuard } from '../../src/auth/jwt.guard.js';
-import { JWT_SECRET, signAccessToken } from '../../src/auth/jwt.js';
+import { JwtGuard, Roles, RolesGuard } from '../../src/core/jwt.guard.js';
+import { JWT_SECRET, signAccessToken } from '../../src/core/jwt.js';
 import { PrismaModule } from '../../src/core/prisma.module.js';
 import { resetDb, testPrisma } from '../helpers/db.js';
 

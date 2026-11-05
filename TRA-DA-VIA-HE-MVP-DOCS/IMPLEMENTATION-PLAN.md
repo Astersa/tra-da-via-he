@@ -1912,7 +1912,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M1-E1-T1 — Tạo khách, đăng nhập [HR]
 - **Đọc:** §3.3 (dòng `/auth/*`, "Quy tắc tài khoản"), §3.6.4 dòng Tạo khách, §3.10.7 dòng Argon2; quyết định B5.
 - **Phạm vi:** `apps/server/src/auth/**`, `apps/server/src/users/**`, `app.module.ts`, `test/integration/auth.spec.ts`, `test/concurrency/guest-limit.concurrency.spec.ts`.
-- **Contract:** `POST /auth/guest`, `POST /auth/login` theo §3.3. **Không có `POST /auth/register`.**
+- **Contract:** `POST /auth/guest`, `POST /auth/login` theo §3.3. **Không có `POST /auth/register`.** Import `PrismaModule` từ `core/` vào `app.module.ts` (M0-E2-T3 cố ý chưa làm). Lỗi Prisma `P2028` (chờ pool quá hạn) trả về `INTERNAL_ERROR` có `retryable: true`, không để lộ lỗi Prisma ra API.
   - `auth/password.service.ts`: `PasswordService { hash(plain): Promise<string>; verify(hash, plain): Promise<boolean> }`, `@node-rs/argon2` với tham số §3.10.7, hàng đợi trong process cho tối đa 2 phép băm cùng lúc.
   - `auth/ip-rate-limit.guard.ts`: decorator `@IpRateLimit(capacity, refillPerSec)`, key `<route>:<req.ip>`, dùng `RateLimiter` trong `core/`. Chỉ đọc `req.ip`.
   - JWT bằng `jose` HS256, `sub=userId`, `exp=15m`.

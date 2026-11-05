@@ -10,6 +10,7 @@
     "build": "prisma generate && nest build",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
+    "provision:server": "tsx scripts/provision-server.ts",
     "db:migrate:test": "node --env-file=.env.test ./node_modules/prisma/build/index.js migrate deploy",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",

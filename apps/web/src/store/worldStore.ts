@@ -52,6 +52,13 @@ export interface WorldStore extends WorldData {
   disconnectWorld: () => void;
   // Gửi player:move (không ack). false nếu chưa joined, đang ngồi, hoặc socket chưa nối.
   sendMove: (req: PlayerMoveReq) => boolean;
+  // Lỗi của hành động ngồi/đứng gần nhất (từ server, hoặc hết giờ). null khi không có lỗi.
+  actionError: { code: string; message: string } | null;
+  // Ngồi vào ghế qua player:sit. true khi server nhận; lỗi thì đặt actionError và trả false.
+  sitSeat: (seatId: string) => Promise<boolean>;
+  // Đứng dậy qua player:stand. Cùng quy ước với sitSeat.
+  standUp: () => Promise<boolean>;
+  clearActionError: () => void;
 }
 
 const EMPTY_DATA: WorldData = {
@@ -76,10 +83,12 @@ const INITIAL = {
   replacedReason: null as WorldStore['replacedReason'],
   error: null as WorldStore['error'],
   positionSync: 0,
+  actionError: null as WorldStore['actionError'],
 };
 
 const MAX_CHAT = 50;
 const JOIN_TIMEOUT_MS = 5000;
+const ACTION_TIMEOUT_MS = 5000;
 const BACKOFF_CAP_MS = 30_000;
 const AUTH_ERROR_CODES = new Set(['TOKEN_EXPIRED', 'UNAUTHENTICATED']);
 // Lý do mất kết nối do mạng: refresh token rồi nối lại. Các lý do khác không tự nối lại.
@@ -114,7 +123,32 @@ export const useWorldStore = create<WorldStore>()((set) => ({
     s.emit('player:move', req);
     return true;
   },
+
+  sitSeat: (seatId) => seatAction(seatId),
+  standUp: () => seatAction(null),
+  clearActionError: () => setWorld({ actionError: null }),
 }));
+
+// player:sit (seatId) hoặc player:stand (null). Thành công thì cập nhật ghế của mình ngay, không chờ event.
+async function seatAction(seatId: string | null): Promise<boolean> {
+  const st = useWorldStore.getState();
+  const s = activeSocket;
+  if (!s || !s.connected || st.status !== 'joined' || !st.self) return false;
+  if (seatId === null ? !st.self.seatId : st.self.seatId !== null) return false;
+  setWorld({ actionError: null });
+  const res =
+    seatId === null
+      ? await emitAck(s, 'player:stand', {}, { timeoutMs: ACTION_TIMEOUT_MS, retries: 0 })
+      : await emitAck(s, 'player:sit', { seatId }, { timeoutMs: ACTION_TIMEOUT_MS, retries: 0 });
+  if (!isCurrent(s)) return false;
+  if (!res.ok) {
+    setWorld({ actionError: { code: res.error.code, message: res.error.message } });
+    return false;
+  }
+  const me = useWorldStore.getState().self;
+  if (me) patchPlayer(me.userId, { seatId: seatId ?? null });
+  return true;
+}
 
 // Đăng xuất (token về null) hoặc refresh thất bại: ngắt world.
 onTokenChange((token) => {

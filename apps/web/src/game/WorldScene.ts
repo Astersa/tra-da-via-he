@@ -4,7 +4,7 @@ import { useWorldStore } from '../store/worldStore';
 import { DEFAULT_AVATAR, SIT_COLUMN, WALK_COLUMNS, WALK_FRAME_MS, frameFor } from './avatar';
 import { bridge } from './bridge';
 import { RemotePlayers } from './RemotePlayers';
-import { seatPrompt } from './remote';
+import { nearestFreeSeat, seatPrompt } from './remote';
 import {
   dirFromVector,
   nextPosition,
@@ -30,7 +30,9 @@ interface KeyMap {
   DOWN: Phaser.Input.Keyboard.Key;
   LEFT: Phaser.Input.Keyboard.Key;
   RIGHT: Phaser.Input.Keyboard.Key;
+  E: Phaser.Input.Keyboard.Key;
 }
+const TOAST_MS = 3000;
 
 // Đang gõ trong ô HTML (chat sau này) thì không nhận phím di chuyển.
 function isTypingInField(): boolean {
@@ -57,6 +59,9 @@ export class WorldScene extends Phaser.Scene {
   private unsubscribePlayers: (() => void) | null = null;
   private remotes!: RemotePlayers;
   private prompt: Phaser.GameObjects.Text | null = null;
+  private toast: Phaser.GameObjects.Text | null = null;
+  private toastTimer: Phaser.Time.TimerEvent | null = null;
+  private unsubscribeErrors: (() => void) | null = null;
 
   constructor() {
     super({ key: WorldScene.KEY });
@@ -75,7 +80,7 @@ export class WorldScene extends Phaser.Scene {
     this.cameras.main.setZoom(1.5);
 
     // addKeys(..., false): không chặn phím mặc định, để ô chat vẫn gõ được.
-    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT', false) as unknown as KeyMap;
+    this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E', false) as unknown as KeyMap;
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => {
       this.target = { x: p.worldX, y: p.worldY };
     });
@@ -91,9 +96,19 @@ export class WorldScene extends Phaser.Scene {
       .setOrigin(0.5, 1)
       .setDepth(11)
       .setVisible(false);
+    this.toast = this.add
+      .text(this.scale.width / 2, 24, '', { fontFamily: '"Be Vietnam Pro", sans-serif', fontSize: '14px', color: '#F8E8D8', backgroundColor: '#B23A3A', padding: { x: 8, y: 4 } })
+      .setOrigin(0.5, 0)
+      .setScrollFactor(0)
+      .setDepth(20)
+      .setVisible(false);
+    this.unsubscribeErrors = useWorldStore.subscribe((st, prev) => {
+      if (st.actionError && st.actionError !== prev.actionError) this.showToast(st.actionError.message);
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubscribeSync?.();
       this.unsubscribePlayers?.();
+      this.unsubscribeErrors?.();
       this.remotes.destroy();
     });
 
@@ -113,6 +128,7 @@ export class WorldScene extends Phaser.Scene {
     // Đang ngồi thì server không nhận player:move: không đi bằng phím hay click.
     const st = useWorldStore.getState();
     const seated = st.self?.seatId != null;
+    if (!typing && Phaser.Input.Keyboard.JustDown(this.keys.E)) this.onSeatKey(st);
     if (typing || seated) {
       this.target = null;
     } else {
@@ -142,6 +158,23 @@ export class WorldScene extends Phaser.Scene {
     this.updateFrame(moved, delta);
     this.updatePrompt(st);
     this.syncToServer(time);
+  }
+
+  // Phím E: đang ngồi thì đứng dậy, gần ghế trống thì ngồi. Lỗi server hiện qua actionError.
+  private onSeatKey(st: ReturnType<typeof useWorldStore.getState>): void {
+    if (st.self?.seatId) {
+      void st.standUp();
+      return;
+    }
+    const seat = nearestFreeSeat(SEATS, this.pos, st.takenSeats);
+    if (seat) void st.sitSeat(seat.id);
+  }
+
+  private showToast(message: string): void {
+    if (!this.toast) return;
+    this.toastTimer?.remove();
+    this.toast.setText(message).setVisible(true);
+    this.toastTimer = this.time.delayedCall(TOAST_MS, () => this.toast?.setVisible(false));
   }
 
   // Gợi ý E: Ngồi / E: Đứng trên đầu avatar mình. Chỉ đổi text khi nội dung đổi.

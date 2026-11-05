@@ -7,10 +7,11 @@ import { displayNameKey } from "../src/rest.js";
 const NO_BODY = "no body";
 const UUID = "123e4567-e89b-42d3-a456-426614174000";
 
-// Đối chiếu với bảng §3.3 (IMPLEMENTATION-PLAN.md dòng 690-745). Mỗi dòng: [method path, Req, Res].
+// Đối chiếu với bảng §3.3 (IMPLEMENTATION-PLAN.md dòng 725-764). Mỗi dòng: [method path, Req, Res].
 // "no body" = không có body/query để validate (hoặc chỉ dùng cookie/path param), hoặc response không có body.
 const ROWS: [string, string, string][] = [
-  ["POST /auth/register", "RegisterReqSchema", "RegisterResSchema"],
+  ["POST /auth/guest", "GuestReqSchema", "GuestResSchema"],
+  ["POST /auth/upgrade", "UpgradeReqSchema", "UpgradeResSchema"],
   ["POST /auth/login", "LoginReqSchema", "LoginResSchema"],
   ["POST /auth/refresh", NO_BODY, "RefreshResSchema"],
   ["POST /auth/logout", NO_BODY, NO_BODY],
@@ -54,8 +55,8 @@ const ROWS: [string, string, string][] = [
 const exportsOf = rest as Record<string, unknown>;
 
 describe("bảng §3.3 đối chiếu schema", () => {
-  it("có đúng 39 dòng endpoint", () => {
-    expect(ROWS.length).toBe(39);
+  it("có đúng 40 dòng endpoint", () => {
+    expect(ROWS.length).toBe(40);
   });
 
   it("mọi schema được tham chiếu trong bảng tồn tại và là zod schema", () => {
@@ -66,7 +67,7 @@ describe("bảng §3.3 đối chiếu schema", () => {
     for (const n of names) {
       expect(exportsOf[n], n).toBeInstanceOf(z.ZodType);
     }
-    // Có 39 dòng, mỗi dòng ghi đủ 2 cột Req/Res.
+    // Có 40 dòng, mỗi dòng ghi đủ 2 cột Req/Res.
     expect(ROWS.every(([, req, res]) => req && res)).toBe(true);
   });
 
@@ -156,9 +157,42 @@ describe("displayNameKey", () => {
   });
 });
 
-describe("email", () => {
-  it("chuẩn hóa lowercase", () => {
-    expect(rest.EmailSchema.parse("  Ab.Cd@Example.COM ")).toBe("ab.cd@example.com");
+describe("username", () => {
+  const ok = (s: string) => rest.UsernameSchema.safeParse(s).success;
+  it("cắt khoảng trắng và chuyển lowercase", () => {
+    expect(rest.UsernameSchema.parse(" Ab_1 ")).toBe("ab_1");
+  });
+  it("độ dài 2 bị loại, 3 và 20 được nhận, 21 bị loại", () => {
+    expect(ok("ab")).toBe(false);
+    expect(ok("abc")).toBe(true);
+    expect(ok("a".repeat(20))).toBe(true);
+    expect(ok("a".repeat(21))).toBe(false);
+  });
+  it("dấu tiếng Việt, dấu gạch ngang, khoảng trắng giữa chữ bị loại", () => {
+    expect(ok("nguyễn")).toBe(false);
+    expect(ok("tra-da")).toBe(false);
+    expect(ok("tra da")).toBe(false);
+  });
+});
+
+describe("auth request schemas", () => {
+  it("LoginReqSchema nhận mật khẩu 1 ký tự", () => {
+    expect(rest.LoginReqSchema.safeParse({ username: "ab_1", password: "x" }).success).toBe(true);
+  });
+  it("UpgradeReqSchema từ chối mật khẩu 7 và 73 ký tự", () => {
+    expect(rest.UpgradeReqSchema.safeParse({ username: "ab_1", password: "a".repeat(7) }).success).toBe(false);
+    expect(rest.UpgradeReqSchema.safeParse({ username: "ab_1", password: "a".repeat(73) }).success).toBe(false);
+  });
+  it("GuestReqSchema từ chối field lạ", () => {
+    expect(rest.GuestReqSchema.safeParse({ displayName: "Trà Đá", avatarId: "avatar_01", email: "a@b.co" }).success).toBe(false);
+  });
+  it("UserViewSchema từ chối field email", () => {
+    const user = {
+      id: UUID, kind: "GUEST", username: null, role: "PLAYER", mutedUntil: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    };
+    expect(rest.UserViewSchema.safeParse(user).success).toBe(true);
+    expect(rest.UserViewSchema.safeParse({ ...user, email: "a@b.co" }).success).toBe(false);
   });
 });
 
@@ -223,7 +257,7 @@ describe("shopName 3..30 (sau trim)", () => {
 
 describe("login password 1..72", () => {
   const login = (n: number) =>
-    rest.LoginReqSchema.safeParse({ email: "a@b.co", password: "x".repeat(n) }).success;
+    rest.LoginReqSchema.safeParse({ username: "ab_1", password: "x".repeat(n) }).success;
   it("độ dài 1 được nhận", () => {
     expect(login(1)).toBe(true);
   });

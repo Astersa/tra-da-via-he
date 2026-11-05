@@ -245,7 +245,7 @@ describe("enum arrays", () => {
       "COMMISSION_EARNED", "SHOP_OPEN_FEE", "TREASURY_WITHDRAWAL", "ADMIN_ADJUST",
     ]);
     expect([...PlotKind]).toEqual(["RESERVED_DEFAULT", "PURCHASABLE"]);
-    expect([...EmploymentStatus]).toEqual(["ACTIVE", "RESIGNED", "TERMINATED", "AUTO_RELEASED"]);
+    expect([...EmploymentStatus]).toEqual(["ACTIVE", "RESIGNED", "TERMINATED", "DAILY_RESET"]);
     expect([...SessionEndReason]).toEqual(["LEFT", "SWITCHED", "REPLACED", "GRACE_EXPIRED", "SERVER_RESTART", "KICKED"]);
   });
 });

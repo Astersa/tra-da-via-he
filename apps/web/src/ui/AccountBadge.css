@@ -1,0 +1,39 @@
+/* Chỉ dùng biến token từ theme/tokens.css (§3.8). */
+.account-badge,
+.logout-confirm {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+  border: 3px solid var(--brown-900);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--brown-900);
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+}
+
+.account-badge {
+  position: fixed;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  width: min(320px, calc(100vw - 16px));
+}
+
+.account-badge *,
+.logout-confirm * {
+  box-sizing: border-box;
+}
+
+.account-badge-warning {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.account-badge-button {
+  width: 100%;
+}

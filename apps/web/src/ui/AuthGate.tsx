@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
+import { LogoutButton } from './AccountBadge';
 import { Button, Panel } from './components';
 import { EntryScreen } from './EntryScreen';
 import { LoginScreen } from './LoginScreen';
@@ -11,7 +12,6 @@ export function AuthGate() {
   const user = useAuthStore((s) => s.user);
   const profile = useAuthStore((s) => s.profile);
   const bootstrap = useAuthStore((s) => s.bootstrap);
-  const logout = useAuthStore((s) => s.logout);
   const [mode, setMode] = useState<'entry' | 'login'>('entry');
 
   useEffect(() => {
@@ -48,9 +48,7 @@ export function AuthGate() {
         <div className="signed-in-stack">
           <Panel title="Đã vào quán">
             <p>Xin chào, {name}!</p>
-            <Button variant="secondary" onClick={() => void logout()}>
-              Đăng xuất
-            </Button>
+            <LogoutButton />
           </Panel>
           <ServerList />
         </div>

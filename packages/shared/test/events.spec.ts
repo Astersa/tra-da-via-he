@@ -249,3 +249,22 @@ describe("enum arrays", () => {
     expect([...SessionEndReason]).toEqual(["LEFT", "SWITCHED", "REPLACED", "GRACE_EXPIRED", "SERVER_RESTART", "KICKED"]);
   });
 });
+
+describe("player:interacted (§3.4.3)", () => {
+  const userId = "00000000-0000-4000-8000-000000000001";
+  const schema = ServerEventSchemas["player:interacted"];
+
+  it("chỉ kind thì qua", () => {
+    expect(schema.safeParse({ userId, kind: "WAVE" }).success).toBe(true);
+  });
+
+  it("chỉ state thì qua", () => {
+    expect(schema.safeParse({ userId, state: "DISCONNECTED" }).success).toBe(true);
+    expect(schema.safeParse({ userId, state: "RECONNECTED" }).success).toBe(true);
+  });
+
+  it("không có cả kind lẫn state thì bị loại; field lạ bị loại", () => {
+    expect(schema.safeParse({ userId }).success).toBe(false);
+    expect(schema.safeParse({ userId, kind: "NOD", extra: 1 }).success).toBe(false);
+  });
+});

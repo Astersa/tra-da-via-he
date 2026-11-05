@@ -921,7 +921,7 @@ Mọi event trừ `world:join` và `world:ping` còn có thể trả `SESSION_ST
 | `player:joined` | `PlayerView` | `server:{id}` trừ bản thân | Session mới |
 | `player:left` | `{userId, reason}` | `server:{id}` | Session kết thúc |
 | `player:moved` | `PlayerMovedEvt` | `server:{id}` (volatile); bản sửa gửi riêng | Tick 100 ms |
-| `player:interacted` | `{userId, kind, seatId?, state?: 'SIT'\|'STAND'\|'DISCONNECTED'\|'RECONNECTED'}` | `server:{id}` | Emote, ngồi/đứng, mất/hồi kết nối |
+| `player:interacted` | `{userId, kind?, seatId?, state?: 'SIT'\|'STAND'\|'DISCONNECTED'\|'RECONNECTED'}`, có ít nhất `kind` hoặc `state` | `server:{id}` | Emote, ngồi/đứng, mất/hồi kết nối |
 | `chat:message` | `ChatMessage` | `server:{id}` | Sau khi kiểm tra |
 | `shop:updated` | `ShopSummary` | `server:{id}` | Đổi trạng thái, số staff online, quán mới, `isHiring` của quán DEFAULT đổi |
 | `shop:application:updated` | `ApplicationView` | Người nộp + chủ quán | Mọi đổi trạng thái |

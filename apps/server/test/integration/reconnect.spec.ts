@@ -21,7 +21,7 @@ const LOOPBACK = '127.0.0.1';
 const ACK_MS = 5000;
 const CASE_MS = 20000;
 const GRACE_MS = 1000;
-const SERVER_EVENTS = ['player:joined', 'player:left', 'player:moved', 'session:replaced', 'disconnect'];
+const SERVER_EVENTS = ['player:joined', 'player:left', 'player:moved', 'player:interacted', 'session:replaced', 'disconnect'];
 
 let app: INestApplication | undefined;
 let url = '';
@@ -189,6 +189,7 @@ describe('reconnect trong grace (M1-E3-T5)', () => {
 
       ca.socket.disconnect();
       await waitUntil(async () => (await reconnectService()).pendingCount() === 1, 'grace timer');
+      await cb.inbox.waitFor('player:interacted', (p) => p.userId === a.id && p.state === 'DISCONNECTED');
 
       const ca2 = await connectAs(a.id);
       expect(await call(ca2.socket, 'world:join', { serverId: server.id, resumeSessionId: sid })).toMatchObject({
@@ -198,6 +199,7 @@ describe('reconnect trong grace (M1-E3-T5)', () => {
       expect((await reconnectService()).pendingCount()).toBe(0);
       expect(app!.get(PresenceStore).get(a.id)?.sessionId).toBe(sid);
 
+      await cb.inbox.waitFor('player:interacted', (p) => p.userId === a.id && p.state === 'RECONNECTED');
       await syncPoint(cb);
       expect(cb.inbox.all('player:left')).toEqual([]);
       expect(cb.inbox.all('player:joined', (p) => p.userId === a.id)).toHaveLength(1);
@@ -287,6 +289,33 @@ describe('reconnect trong grace (M1-E3-T5)', () => {
       await syncPoint(cb);
       expect(cb.inbox.all('player:left', (p) => p.userId === a.id)).toEqual([]);
       expect(await activeSessionId(a.id)).toBe(sid2);
+      expect(await call(ca2.socket, 'world:resync', {})).toMatchObject({ ok: true });
+    },
+    CASE_MS,
+  );
+  it(
+    'ngắt, socket khác của cùng user join lại, rồi hết thời gian grace: timer không kết thúc session',
+    async () => {
+      const server = await activeServer();
+      const a = await seedPlayer();
+      const b = await seedPlayer();
+      const cb = await connectAs(b.id);
+      await joinOk(cb, server.id);
+      const ca1 = await connectAs(a.id);
+      await joinOk(ca1, server.id);
+      const sid = (await activeSessionId(a.id)) as string;
+
+      ca1.socket.disconnect();
+      await waitUntil(async () => (await reconnectService()).pendingCount() === 1, 'grace timer');
+
+      const ca2 = await connectAs(a.id);
+      await joinOk(ca2, server.id);
+      expect((await reconnectService()).pendingCount()).toBe(0);
+
+      await elapse(GRACE_MS + 300);
+      await syncPoint(cb);
+      expect(await activeSessionId(a.id)).toBe(sid);
+      expect(cb.inbox.all('player:left', (p) => p.userId === a.id)).toEqual([]);
       expect(await call(ca2.socket, 'world:resync', {})).toMatchObject({ ok: true });
     },
     CASE_MS,
@@ -389,10 +418,11 @@ describe('vị trí khi session kết thúc (M1-E3-T5)', () => {
       await waitUntil(() => app!.get(PresenceStore).get(a.id)?.seq === 1, 'move applied');
 
       ca.socket.disconnect();
+      // The hook writes lastX after the commit, so wait for the position itself, not only for ENDED.
       await waitUntil(async () => {
         const row = await testPrisma.serverSession.findUnique({ where: { id: sid } });
-        return row?.status === 'ENDED';
-      }, 'grace expiry');
+        return row?.status === 'ENDED' && row.lastX !== null;
+      }, 'grace expiry with position saved');
       expect(await testPrisma.serverSession.findUnique({ where: { id: sid } })).toMatchObject({
         endReason: 'GRACE_EXPIRED',
         lastX: p.x,

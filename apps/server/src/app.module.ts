@@ -5,9 +5,10 @@ import { ApiErrorFilter } from './core/app-error.filter.js';
 import { AuthCoreModule } from './core/auth-core.module.js';
 import { HealthController } from './core/health.controller.js';
 import { PrismaModule } from './core/prisma.module.js';
+import { ServersModule } from './servers/servers.module.js';
 
 @Module({
-  imports: [PrismaModule, AuthCoreModule, AuthModule],
+  imports: [PrismaModule, AuthCoreModule, AuthModule, ServersModule],
   controllers: [HealthController],
   providers: [{ provide: APP_FILTER, useClass: ApiErrorFilter }],
 })

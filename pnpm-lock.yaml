@@ -175,6 +175,9 @@ importers:
       oxlint-tsgolint:
         specifier: 7.0.2005
         version: 7.0.2005
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
 
   apps/server:
     dependencies:
@@ -313,6 +316,9 @@ importers:
         specifier: 4.6.7
         version: 4.6.7
     devDependencies:
+      '@types/node':
+        specifier: 24.19.2
+        version: 24.19.2
       typescript:
         specifier: 6.0.3
         version: 6.0.3

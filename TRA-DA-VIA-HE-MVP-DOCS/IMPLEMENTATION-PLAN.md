@@ -1445,7 +1445,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M0-E1-T2 — pnpm workspace
 - **Đọc:** §3.1 bảng version và bẫy toolchain.
 - **Phạm vi:** `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json`, `.nvmrc`, `.prettierrc`.
-- **Việc:** root `package.json`: `private`, `packageManager: "pnpm@12.15.0"`, `engines.node: ">=24"`, các script `verify`, `lint`, `lint:boundaries`, `check:money`, `test:db:up`, `test:db:down` (script chưa có công cụ thì đặt ở task sau). `pnpm-workspace.yaml` gồm `apps/*`, `packages/*`, `tools/*`, và `allowBuilds` với `prisma`, `@prisma/engines`. `.nvmrc`: `24`. `tsconfig.base.json`: `strict`, `target ES2023`, `module nodenext`, `moduleResolution nodenext`, `skipLibCheck`, `noUncheckedIndexedAccess`.
+- **Việc:** root `package.json`: `private`, `packageManager: "pnpm@12.15.0"`, `engines.node: ">=24"`, các script `verify`, `lint`, `lint:boundaries`, `check:money`, `test:db:up`, `test:db:down` (script chưa có công cụ thì đặt ở task sau). `pnpm-workspace.yaml` gồm `apps/*`, `packages/*`, `tools/*`, và `allowBuilds` với `prisma`, `@prisma/engines`. `.nvmrc`: `24`. `.prettierrc`: `{ "singleQuote": true, "trailingComma": "all" }`. `tsconfig.base.json`: `strict`, `target ES2023`, `module nodenext`, `moduleResolution nodenext`, `skipLibCheck`, `noUncheckedIndexedAccess`.
 - **AC:** `pnpm install` thoát mã 0 với pnpm 12.15.0.
 - **Test:** không có.
 - **Verify:** `pnpm install && pnpm -v`.

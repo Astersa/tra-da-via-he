@@ -24,6 +24,10 @@ export const SCAN_ROOTS = ['apps/server/src', 'apps/web/src', 'packages/shared/s
 const EXCLUDED_SEGMENTS = new Set(['test', 'prisma', 'generated', 'dist', 'node_modules']);
 const ALLOWED_PREFIX = 'apps/server/src/economy/';
 
+// Only core/tx.ts may open a Prisma transaction (M0-E2-T3). Applies everywhere, economy included.
+export const TX_TOKEN = '$transaction';
+export const TX_ALLOWED_FILE = 'apps/server/src/core/tx.ts';
+
 const SOURCE_EXT = /\.(ts|tsx|js|mjs|cjs|jsx)$/;
 
 function toPosix(p) {
@@ -59,11 +63,18 @@ export function findMoneyWriteViolations(rootDir) {
     }
     if (!exists) continue;
     for (const { rel, full } of walk(absRoot, rootDir)) {
-      if (rel.startsWith(ALLOWED_PREFIX)) continue;
+      const economy = rel.startsWith(ALLOWED_PREFIX);
+      const txAllowed = rel === TX_ALLOWED_FILE;
+      if (economy && txAllowed) continue;
       const lines = readFileSync(full, 'utf8').split(/\r?\n/);
       lines.forEach((text, i) => {
-        for (const token of FORBIDDEN_TOKENS) {
-          if (text.includes(token)) violations.push({ file: rel, line: i + 1, token });
+        if (!economy) {
+          for (const token of FORBIDDEN_TOKENS) {
+            if (text.includes(token)) violations.push({ file: rel, line: i + 1, token });
+          }
+        }
+        if (!txAllowed && text.includes(TX_TOKEN)) {
+          violations.push({ file: rel, line: i + 1, token: TX_TOKEN });
         }
       });
     }
@@ -78,7 +89,11 @@ if (isMain) {
   const violations = findMoneyWriteViolations(repoRoot);
   if (violations.length > 0) {
     for (const v of violations) {
-      console.error(`${v.file}:${v.line}: forbidden token "${v.token}" outside apps/server/src/economy/`);
+      const where =
+        v.token === TX_TOKEN
+          ? `"${TX_TOKEN}" is allowed only in ${TX_ALLOWED_FILE}`
+          : 'outside apps/server/src/economy/';
+      console.error(`${v.file}:${v.line}: forbidden token "${v.token}" ${where}`);
     }
     console.error(`check:money FAILED (${violations.length} violation(s)).`);
     process.exit(1);

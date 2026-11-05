@@ -301,3 +301,82 @@ test('chuyển máy chủ (socket): người ở lại thấy người đi biế
   socket.disconnect();
   await ctx.close();
 });
+
+test('chuyển máy chủ qua UI: B ở máy chủ cũ thấy A đi, C ở máy chủ mới thấy A, chat chỉ ở máy chủ mới, F5 về máy chủ mới', async ({ browser }, testInfo) => {
+  test.setTimeout(TEST_TIMEOUT_MS);
+  // Máy chủ đích tạo trong test, như ca socket ở trên. Slug và tên có hậu tố riêng để thẻ không trùng với lần chạy khác.
+  const suffix = `${Date.now() % 1_000_000}`;
+  const SWITCH_NAME = `Quán Ba ${suffix}`;
+  provisionExtraServer(`e2e-ui-switch-${suffix}`, SWITCH_NAME);
+  const [source] = await query<{ id: string }>(`SELECT id FROM "GameServer" WHERE slug = 'e2e-main'`);
+  const [target] = await query<{ id: string }>(`SELECT id FROM "GameServer" WHERE name = $1`, [SWITCH_NAME]);
+  expect(source).toBeDefined();
+  expect(target).toBeDefined();
+
+  // A ở 390px để kiểm tra không tràn ngang khi hộp đổi máy chủ mở.
+  const ctxA = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const ctxB = await browser.newContext();
+  const ctxC = await browser.newContext();
+  const pageA = await ctxA.newPage();
+  const pageB = await ctxB.newPage();
+  const pageC = await ctxC.newPage();
+  const framesB = watchFrames(pageB);
+  const nameA = uniqueName('Sang');
+  const nameB = uniqueName('Xem');
+  const nameC = uniqueName('Moi');
+  // B vào trước để thấy A bằng player:joined (B đã có mặt khi A vào). C vào máy chủ đích trước khi A chuyển tới.
+  const framesC = watchFrames(pageC);
+  await enterServer(pageB, nameB, SERVER_NAME, 1);
+  await enterServer(pageA, nameA, SERVER_NAME, 0);
+  await enterServer(pageC, nameC, SWITCH_NAME, 2);
+  const userA = (await userByName(nameA)).id;
+  await expect.poll(() => joinedEvents(framesB, nameA).length, { timeout: 15_000 }).toBeGreaterThan(0);
+
+  // A mở hộp đổi máy chủ: không có máy chủ hiện tại trong danh sách, không tràn ngang.
+  await pageA.getByRole('button', { name: 'Đổi máy chủ' }).click();
+  const dialog = pageA.getByRole('dialog', { name: 'Đổi máy chủ' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: SERVER_NAME, exact: true })).toHaveCount(0);
+  const overflow = await pageA.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+
+  // Chọn máy chủ đích: hộp đóng, A thấy đúng máy chủ mới.
+  const card = dialog.locator('article.server-card').filter({
+    has: pageA.getByRole('heading', { name: SWITCH_NAME, exact: true }),
+  });
+  await card.getByRole('button', { name: 'Chuyển sang máy chủ này' }).click();
+  await expect(dialog).toHaveCount(0, { timeout: 15_000 });
+  await expect(pageA.locator('.game-host canvas')).toBeVisible();
+
+  // B ở máy chủ cũ thấy A biến mất; C ở máy chủ mới thấy A xuất hiện.
+  await expect
+    .poll(() => framesB.received.some((e) => e.name === 'player:left' && (e.data as { userId: string }).userId === userA), {
+      timeout: 10_000,
+    })
+    .toBe(true);
+  await expect.poll(() => joinedEvents(framesC, nameA).length, { timeout: 10_000 }).toBeGreaterThan(0);
+
+  // DB: phiên cũ ENDED SWITCHED trên máy chủ nguồn, một phiên ACTIVE trên máy chủ đích.
+  const sessions = await sessionsOf(userA);
+  expect(sessions.filter((s) => s.serverId === source!.id).every((s) => s.status === 'ENDED')).toBe(true);
+  expect(sessions.some((s) => s.serverId === source!.id && s.endReason === 'SWITCHED')).toBe(true);
+  expect(sessions.filter((s) => s.status === 'ACTIVE')).toEqual([expect.objectContaining({ serverId: target!.id })]);
+
+  // Chat của A ở máy chủ mới: C nhận, B (máy chủ cũ) không nhận.
+  const msg = 'Chào quán mới';
+  await pageA.getByLabel('Nhập tin nhắn').fill(msg);
+  await pageA.getByRole('button', { name: 'Gửi' }).click();
+  await expect(pageC.getByRole('log', { name: 'Tin nhắn' }).getByText(msg)).toBeVisible({ timeout: 10_000 });
+  await expect(pageB.getByRole('log', { name: 'Tin nhắn' }).getByText(msg)).toHaveCount(0);
+
+  // F5 sau khi đổi: vào lại đúng máy chủ mới, không tạo phiên mới.
+  const before = await sessionsOf(userA);
+  await pageA.reload();
+  await expect(pageA.locator('.game-host canvas')).toBeVisible({ timeout: 15_000 });
+  await expect(pageA.locator('.game-overlay')).toHaveCount(0, { timeout: 15_000 });
+  expect(await sessionsOf(userA)).toEqual(before);
+
+  await ctxA.close();
+  await ctxB.close();
+  await ctxC.close();
+});

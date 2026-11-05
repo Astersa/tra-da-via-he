@@ -3,6 +3,7 @@ import { AuthGate } from './ui/AuthGate';
 import { ChatPanel } from './ui/ChatPanel';
 import { UpgradeDialog } from './ui/UpgradeDialog';
 import { ColdStartScreen } from './ui/ColdStartScreen';
+import { ServerSwitch } from './ui/ServerSwitch';
 import { GameView } from './game/GameView';
 import { useConnectivityStore } from './store/connectivityStore';
 import { useWorldStore } from './store/worldStore';
@@ -25,6 +26,7 @@ export function App() {
           <ChatPanel />
           <AccountBadge />
           <HudLogout />
+          <ServerSwitch />
           {waking && <ColdStartScreen />}
         </>
       )}

@@ -1,0 +1,26 @@
+/* Nút đổi máy chủ nằm dưới nút đăng xuất ở góc phải (AccountBadge.css). */
+.hud-switch {
+  position: fixed;
+  top: 56px;
+  right: 8px;
+  z-index: 5;
+  width: min(240px, calc(100vw - 16px));
+}
+
+/* Hộp đổi máy chủ phủ màn chơi; cuộn trong khung khi danh sách dài, không tràn ngang ở 390px. */
+.switch-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.switch-overlay .panel {
+  width: min(420px, 100%);
+  max-height: calc(100vh - 16px);
+  overflow-y: auto;
+  box-sizing: border-box;
+}

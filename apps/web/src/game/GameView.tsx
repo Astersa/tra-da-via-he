@@ -4,7 +4,8 @@ import { bridge } from './bridge';
 import { createGame } from './createGame';
 import './GameView.css';
 
-// Màn chơi: tạo Phaser đúng một lần, hủy khi unmount (kể cả StrictMode chạy effect hai lần).
+// Màn chơi: tạo Phaser một lần cho mỗi máy chủ, hủy khi unmount hoặc khi đổi máy chủ (kể cả StrictMode chạy effect hai lần).
+// Đổi máy chủ hủy game cũ để người chơi, chat bong bóng và sprite của server cũ không còn trong scene mới (§3.5.3, M1-E5-T10).
 export function GameView() {
   const hostRef = useRef<HTMLDivElement>(null);
   const status = useWorldStore((s) => s.status);
@@ -33,7 +34,7 @@ export function GameView() {
       game.destroy(true);
       host.replaceChildren();
     };
-  }, []);
+  }, [serverId]);
 
   let message: string | null = null;
   let action: { label: string; onClick: () => void } | null = null;

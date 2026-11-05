@@ -11,14 +11,17 @@ const LOAD_TEXT: Record<ServerCard['load'], string> = {
   HIGH: 'Đông',
 };
 
-function ServerCardView({
+// Thẻ máy chủ dùng chung cho màn chọn máy chủ và hộp đổi máy chủ trong game.
+export function ServerCardView({
   server,
   disabled,
   onSelect,
+  actionLabel = 'Vào máy chủ này',
 }: {
   server: ServerCard;
   disabled: boolean;
   onSelect: (serverId: string) => void;
+  actionLabel?: string;
 }) {
   return (
     <article className="server-card">
@@ -46,7 +49,7 @@ function ServerCardView({
         </div>
       </dl>
       <Button variant="secondary" disabled={disabled} onClick={() => onSelect(server.id)}>
-        Vào máy chủ này
+        {actionLabel}
       </Button>
     </article>
   );

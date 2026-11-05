@@ -11,7 +11,7 @@
     "lint": "pnpm --filter @tdvh/server lint && oxlint --type-aware -c .oxlintrc.json apps/web/src packages/shared/src && oxlint -c .oxlintrc.json scripts",
     "lint:boundaries": "depcruise --config .dependency-cruiser.cjs apps/server/src apps/web/src packages/shared/src",
     "check:money": "node scripts/check-money-writes.mjs",
-    "test:scripts": "node --test scripts/check-money-writes.spec.mjs",
+    "test:scripts": "node --test scripts/check-money-writes.spec.mjs scripts/render-yaml.spec.mjs",
     "verify": "pnpm -r build && pnpm lint && pnpm lint:boundaries && pnpm check:money && pnpm -r test && pnpm test:scripts"
   },
   "devDependencies": {

@@ -107,7 +107,11 @@ export class SessionService {
   }
 
   // Counts ACTIVE sessions on the server (no presence store yet, M1-E4-T3). At hardCap: SERVER_FULL.
+  // Takes the per-server capacity lock before counting (§3.6.1 "Giới hạn người chơi"), so two users
+  // on the same server cannot both count a free slot and both insert. Called only right before a new
+  // session is opened, after the user lock; a reused session never reaches this.
   private async assertCapacity(tx: Tx, server: GameServer): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`server-cap:${server.id}`}, 0))`;
     const online = await tx.serverSession.count({ where: { serverId: server.id, status: 'ACTIVE' } });
     if (online >= server.hardCap) throw new AppError('SERVER_FULL');
   }

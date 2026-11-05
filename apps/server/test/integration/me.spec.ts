@@ -219,7 +219,7 @@ describe('RolesGuard: @Roles(ADMIN)', () => {
 describe('GET /me', () => {
   it('khách: username null, không có passwordHash', async () => {
     const created = await call('POST', '/auth/guest', { body: { displayName: 'Khách Mới', avatarId: 'avatar_02' } });
-    expect(created.status).toBe(200);
+    expect(created.status).toBe(201);
     const res = await get('/me', created.body.accessToken);
     expect(res.status).toBe(200);
     expect(() => MeResSchema.parse(res.body)).not.toThrow();

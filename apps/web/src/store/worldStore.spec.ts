@@ -3,6 +3,7 @@ import type { PlayerView, WorldState } from '@tdvh/shared';
 import { useWorldStore } from './worldStore';
 import { createSocket, type TypedSocket } from '../socket/createSocket';
 import { refreshSession, setAccessToken } from '../api/client';
+import { useConnectivityStore } from './connectivityStore';
 
 vi.mock('../socket/createSocket', () => ({ createSocket: vi.fn() }));
 vi.mock('../api/client', async (importOriginal) => {
@@ -399,5 +400,33 @@ describe('worldStore: chat', () => {
   it('sendChat khi chưa joined thì không emit', async () => {
     expect(await useWorldStore.getState().sendChat('Chào', CLIENT_MSG)).toBe(false);
     expect(fake.emitted.some((e) => e.event === 'chat:send')).toBe(false);
+  });
+});
+
+describe('cold start qua socket (§3.10.6)', () => {
+  it('không nối được trong 5 giây thì connectivity waking; nối được thì ok', async () => {
+    useFake();
+    useWorldStore.getState().connect(SERVER);
+    fake.fire('connect_error', new Error('websocket error'));
+    await tick(4_999);
+    expect(useConnectivityStore.getState().status).toBe('ok');
+    await tick(1);
+    expect(useConnectivityStore.getState().status).toBe('waking');
+    fake.fire('connect');
+    expect(useConnectivityStore.getState().status).toBe('ok');
+    useWorldStore.getState().disconnectWorld();
+  });
+
+  it('joined thì gửi world:ping mỗi 5 phút; rời quán thì dừng', async () => {
+    useFake();
+    await joinedWorld();
+    const pings = () => fake.emitted.filter((e) => e.event === 'world:ping').length;
+    await tick(300_000);
+    expect(pings()).toBe(1);
+    await tick(300_000);
+    expect(pings()).toBe(2);
+    useWorldStore.getState().disconnectWorld();
+    await tick(600_000);
+    expect(pings()).toBe(2);
   });
 });

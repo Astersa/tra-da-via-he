@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MeResSchema } from '@tdvh/shared';
 import { ApiError, onSessionLost, request, setAccessToken, getAccessToken } from './client';
+import { useConnectivityStore } from '../store/connectivityStore';
 
 type Handler = (url: string, init: RequestInit) => Response | Promise<Response>;
 
@@ -146,20 +147,22 @@ describe('request', () => {
       return json(401, { error: { code: 'UNAUTHENTICATED', message: 'x' } });
     });
 
-    await expect(request('/me', { schema: MeResSchema })).rejects.toBeInstanceOf(TypeError);
+    const err = (await request('/me', { schema: MeResSchema }).catch((e: unknown) => e)) as ApiError;
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.code).toBe('SERVICE_WAKING');
     off();
     expect(lost).not.toHaveBeenCalled();
     expect(getAccessToken()).toBe('old');
   });
 
-  it('lỗi có mã lạ được đổi thành INTERNAL_ERROR; body không phải JSON cũng vậy', async () => {
+  it('lỗi có mã lạ được đổi thành INTERNAL_ERROR; 502 là SERVICE_WAKING chứ không phải lỗi thường', async () => {
     mockFetch(() => json(400, { error: { code: 'NOT_A_CODE', message: 'x' } }));
     const a = (await request('/x').catch((e: unknown) => e)) as ApiError;
     expect(a.code).toBe('INTERNAL_ERROR');
 
     mockFetch(() => new Response('<html>502</html>', { status: 502 }));
     const b = (await request('/x').catch((e: unknown) => e)) as ApiError;
-    expect(b.code).toBe('INTERNAL_ERROR');
+    expect(b.code).toBe('SERVICE_WAKING');
     expect(b.status).toBe(502);
   });
 
@@ -175,5 +178,81 @@ describe('request', () => {
 
     await request('/me', { schema: MeResSchema });
     expect(request_.mock.calls[0]?.[0]).toBe('tdvh-refresh');
+  });
+});
+
+// Cold start (§3.10.6): lỗi tạm thời đánh dấu waking, không đăng xuất; chỉ 401 mới là chưa đăng nhập.
+describe('cold start', () => {
+  beforeEach(() => {
+    useConnectivityStore.setState({ status: 'ok', since: null, gaveUp: false });
+  });
+
+  it.each([502, 503, 504])('HTTP %i trên /api đánh dấu waking và ném SERVICE_WAKING', async (status) => {
+    mockFetch(() => new Response('<html>wait</html>', { status }));
+    const err = (await request('/me').catch((e: unknown) => e)) as ApiError;
+    expect(err.code).toBe('SERVICE_WAKING');
+    expect(useConnectivityStore.getState().status).toBe('waking');
+  });
+
+  it('body không phải JSON với 200 đánh dấu waking', async () => {
+    mockFetch(() => new Response('<html>Render</html>', { status: 200 }));
+    const err = (await request('/me').catch((e: unknown) => e)) as ApiError;
+    expect(err.code).toBe('SERVICE_WAKING');
+    expect(useConnectivityStore.getState().status).toBe('waking');
+  });
+
+  it('401 không đánh dấu waking', async () => {
+    setAccessToken('old');
+    mockFetch(() => json(401, { error: { code: 'UNAUTHENTICATED', message: 'x' } }));
+    await request('/me').catch(() => undefined);
+    expect(useConnectivityStore.getState().status).toBe('ok');
+  });
+
+  it('refresh bị 503 không đăng xuất và giữ token', async () => {
+    setAccessToken('old');
+    const lost = vi.fn();
+    const off = onSessionLost(lost);
+    mockFetch((url) =>
+      url.endsWith('/auth/refresh')
+        ? new Response('', { status: 503 })
+        : json(401, { error: { code: 'UNAUTHENTICATED', message: 'x' } }),
+    );
+    const err = (await request('/me', { schema: MeResSchema }).catch((e: unknown) => e)) as ApiError;
+    off();
+    expect(err.code).toBe('SERVICE_WAKING');
+    expect(lost).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe('old');
+    expect(useConnectivityStore.getState().status).toBe('waking');
+  });
+
+  it('refresh bị 401 vẫn đăng xuất như cũ', async () => {
+    setAccessToken('old');
+    const lost = vi.fn();
+    const off = onSessionLost(lost);
+    mockFetch(() => json(401, { error: { code: 'UNAUTHENTICATED', message: 'x' } }));
+    await request('/me', { schema: MeResSchema }).catch(() => undefined);
+    off();
+    expect(lost).toHaveBeenCalledTimes(1);
+    expect(useConnectivityStore.getState().status).toBe('ok');
+  });
+
+  it('POST /auth/guest bị 503 không tự gửi lại', async () => {
+    const fetchMock = mockFetch(() => new Response('', { status: 503 }));
+    const err = (await request('/auth/guest', { method: 'POST', body: {} }).catch((e: unknown) => e)) as ApiError;
+    expect(err.code).toBe('SERVICE_WAKING');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('request thành công xóa trạng thái waking', async () => {
+    useConnectivityStore.getState().markWaking();
+    mockFetch(() => json(200, ME_BODY));
+    await request('/me', { schema: MeResSchema });
+    expect(useConnectivityStore.getState().status).toBe('ok');
+  });
+
+  it('logout 204 không có body không bị coi là waking', async () => {
+    mockFetch(() => new Response(null, { status: 204 }));
+    await request('/auth/logout', { method: 'POST' });
+    expect(useConnectivityStore.getState().status).toBe('ok');
   });
 });

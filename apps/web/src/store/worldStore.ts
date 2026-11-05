@@ -14,6 +14,8 @@ import { create } from 'zustand';
 import { getAccessToken, onSessionLost, onTokenChange, refreshSession } from '../api/client';
 import { createSocket, type TypedSocket } from '../socket/createSocket';
 import { emitAck } from '../socket/emitAck';
+import { startKeepAwake } from '../socket/keepAwake';
+import { useConnectivityStore } from './connectivityStore';
 
 type Plot = WorldState['plots'][number];
 type Staff = WorldState['staff'];
@@ -103,6 +105,10 @@ const AUTH_ERROR_CODES = new Set(['TOKEN_EXPIRED', 'UNAUTHENTICATED']);
 // Lý do mất kết nối do mạng: refresh token rồi nối lại. Các lý do khác không tự nối lại.
 const RECONNECT_REASONS = new Set(['transport close', 'ping timeout', 'transport error']);
 const STORAGE_KEY = 'tdvh.world';
+// Socket không nối lại được sau 5 giây thì coi là service đang ngủ (§3.10.6).
+const WAKING_AFTER_MS = 5000;
+// Mỗi 5 phút khi tab hiển thị và đã joined (§3.10.6); không dùng pinger ngoài.
+const KEEP_AWAKE_MS = 300_000;
 
 // ---- Trạng thái kết nối (biến module, không đưa vào state để khỏi render) ----
 let activeSocket: TypedSocket | null = null;
@@ -110,6 +116,8 @@ let stopped = true;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let retryCount = 0;
 let authRetried = false;
+let wakingTimer: ReturnType<typeof setTimeout> | null = null;
+let stopKeepAwake: (() => void) | null = null;
 // seq mới nhất đã áp dụng cho từng người chơi khác (chống áp dụng bản cũ).
 const lastSeq = new Map<string, number>();
 
@@ -120,6 +128,7 @@ export const useWorldStore = create<WorldStore>()((set) => ({
     const s = attachSocket();
     lastSeq.clear();
     set({ ...INITIAL, status: 'connecting', serverId });
+    armWakingTimer(s);
     s.connect();
   },
 
@@ -199,9 +208,32 @@ function clearRetry(): void {
   }
 }
 
+function clearWakingTimer(): void {
+  if (wakingTimer !== null) {
+    clearTimeout(wakingTimer);
+    wakingTimer = null;
+  }
+}
+
+// Đặt hẹn 5 giây: nếu vẫn chưa nối được thì báo service đang thức (màn chờ). Đã đặt thì không đặt lại.
+function armWakingTimer(s: TypedSocket): void {
+  if (wakingTimer !== null) return;
+  wakingTimer = setTimeout(() => {
+    wakingTimer = null;
+    if (isCurrent(s) && !s.connected) useConnectivityStore.getState().markWaking();
+  }, WAKING_AFTER_MS);
+}
+
+function stopKeepAlive(): void {
+  if (stopKeepAwake) stopKeepAwake();
+  stopKeepAwake = null;
+}
+
 function detachSocket(): void {
   stopped = true;
   clearRetry();
+  clearWakingTimer();
+  stopKeepAlive();
   const s = activeSocket;
   activeSocket = null;
   if (s) {
@@ -225,7 +257,18 @@ function disconnectWorld(): void {
   detachSocket();
   lastSeq.clear();
   clearResume();
+  // Rời quán hoặc đăng xuất: không còn socket để chờ, bỏ trạng thái chờ do socket gây ra.
+  useConnectivityStore.getState().markOk();
   setWorld({ ...INITIAL });
+}
+
+// Bật keepAwake sau khi joined; gọi lại thì thay bằng bộ đếm mới.
+function startKeepAlive(s: TypedSocket): void {
+  stopKeepAlive();
+  stopKeepAwake = startKeepAwake(s as unknown as Parameters<typeof startKeepAwake>[0], {
+    intervalMs: KEEP_AWAKE_MS,
+    isVisible: () => typeof document === 'undefined' || document.visibilityState === 'visible',
+  });
 }
 
 function scheduleRetry(s: TypedSocket): void {
@@ -311,6 +354,7 @@ async function joinWorld(s: TypedSocket): Promise<void> {
   applyWorldState(parsed.data);
   setWorld({ status: 'joined', error: null });
   saveResume(serverId, parsed.data.sessionId);
+  startKeepAlive(s);
 }
 
 function failWorld(code: string, message: string): void {
@@ -320,16 +364,23 @@ function failWorld(code: string, message: string): void {
 function bindSocket(s: TypedSocket): void {
   s.on('connect', () => {
     if (!isCurrent(s)) return;
+    clearWakingTimer();
+    useConnectivityStore.getState().markOk();
     retryCount = 0;
     authRetried = false;
     void joinWorld(s);
   });
   s.on('connect_error', (err: Error) => {
-    if (isCurrent(s)) void onConnectError(s, err.message);
+    if (!isCurrent(s)) return;
+    armWakingTimer(s);
+    void onConnectError(s, err.message);
   });
   s.on('disconnect', (reason: string) => {
     if (!isCurrent(s)) return;
-    if (RECONNECT_REASONS.has(reason)) scheduleRetry(s);
+    if (RECONNECT_REASONS.has(reason)) {
+      armWakingTimer(s);
+      scheduleRetry(s);
+    }
     else if (reason === 'io server disconnect') setWorld({ status: 'disconnected' });
     // 'io client disconnect' do chính ta gọi (detach): không làm gì.
   });

@@ -1,7 +1,14 @@
 import { ERROR_CODES, RefreshResSchema, type ErrorCode } from '@tdvh/shared';
+import { useConnectivityStore } from '../store/connectivityStore';
 
 export const API_BASE = '/api/v1';
 const REFRESH_LOCK = 'tdvh-refresh';
+
+// SERVICE_WAKING là mã nội bộ của client (không nằm trong ERROR_CODES): lỗi tạm thời do service đang ngủ.
+export type ClientErrorCode = ErrorCode | 'SERVICE_WAKING';
+
+// 502/503/504 từ proxy của Render khi service đang ngủ hoặc khởi động lại (§3.10.6).
+const WAKING_STATUSES = new Set([502, 503, 504]);
 
 // Chỉ cần safeParse: tránh kéo zod vào apps/web.
 export interface Parser<T> {
@@ -9,10 +16,10 @@ export interface Parser<T> {
 }
 
 export class ApiError extends Error {
-  readonly code: ErrorCode;
+  readonly code: ClientErrorCode;
   readonly status: number;
 
-  constructor(code: ErrorCode, message: string, status: number) {
+  constructor(code: ClientErrorCode, message: string, status: number) {
     super(message);
     this.name = 'ApiError';
     this.code = code;
@@ -85,18 +92,38 @@ export function refreshSession(staleToken: string | null = accessToken): Promise
   return inflightRefresh;
 }
 
+// Lỗi tạm thời: đánh dấu service đang thức và ném SERVICE_WAKING. Không đăng xuất, không xóa token.
+function wakingError(status: number): ApiError {
+  useConnectivityStore.getState().markWaking();
+  return new ApiError('SERVICE_WAKING', 'Quán đang mở cửa, chờ chút rồi thử lại', status);
+}
+
+// Lỗi mạng (fetch ném) được coi là service chưa thức.
+async function fetchOrWake(input: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init);
+  } catch {
+    throw wakingError(0);
+  }
+}
+
 async function doRefresh(): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/auth/refresh`, { method: 'POST', credentials: 'include' });
+  const res = await fetchOrWake(`${API_BASE}/auth/refresh`, { method: 'POST', credentials: 'include' });
   if (res.status === 401) {
     notifySessionLost();
     return false;
   }
+  if (WAKING_STATUSES.has(res.status)) throw wakingError(res.status);
   if (!res.ok) {
     throw new ApiError('INTERNAL_ERROR', 'Refresh thất bại', res.status);
   }
-  const parsed = RefreshResSchema.safeParse(await res.json().catch(() => undefined));
+  const json: unknown = await res.json().catch(() => undefined);
+  // 2xx nhưng không phải JSON: thường là trang chờ của proxy, coi là service chưa thức.
+  if (json === undefined) throw wakingError(res.status);
+  const parsed = RefreshResSchema.safeParse(json);
   if (!parsed.success) throw new ApiError('INTERNAL_ERROR', 'Phản hồi không hợp lệ', res.status);
   setAccessToken(parsed.data.accessToken);
+  useConnectivityStore.getState().markOk();
   return true;
 }
 
@@ -111,7 +138,7 @@ async function send(path: string, opts: RequestOpts<unknown>, token: string | nu
   const headers: Record<string, string> = { Accept: 'application/json' };
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
-  return fetch(`${API_BASE}${path}`, {
+  return fetchOrWake(`${API_BASE}${path}`, {
     method: opts.method ?? 'GET',
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
@@ -120,13 +147,17 @@ async function send(path: string, opts: RequestOpts<unknown>, token: string | nu
 }
 
 async function parseResponse<T>(res: Response, opts: RequestOpts<T>): Promise<T> {
+  if (WAKING_STATUSES.has(res.status)) throw wakingError(res.status);
   const json: unknown = await res.json().catch(() => undefined);
+  // 204 không có body là bình thường (logout). Các trường hợp khác không phải JSON: coi là service chưa thức.
+  if (json === undefined && res.status !== 204) throw wakingError(res.status);
   if (!res.ok) {
     const error = (json as { error?: { code?: unknown; message?: unknown } } | undefined)?.error;
     const code = isErrorCode(error?.code) ? error.code : 'INTERNAL_ERROR';
     const message = typeof error?.message === 'string' ? error.message : 'Lỗi không xác định';
     throw new ApiError(code, message, res.status);
   }
+  useConnectivityStore.getState().markOk();
   if (!opts.schema) return undefined as T;
   const parsed = opts.schema.safeParse(json);
   if (!parsed.success) throw new ApiError('INTERNAL_ERROR', 'Phản hồi không hợp lệ', res.status);

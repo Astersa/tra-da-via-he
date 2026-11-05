@@ -3,6 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { Button, Panel } from './components';
 import { EntryScreen } from './EntryScreen';
 import { LoginScreen } from './LoginScreen';
+import { ServerList } from './ServerList';
 
 // Chọn màn theo trạng thái đăng nhập. Chưa vào quán thì hiện màn vào; đã vào thì hiện vùng tạm.
 export function AuthGate() {
@@ -44,13 +45,15 @@ export function AuthGate() {
     const name = profile?.displayName ?? user?.username ?? 'bạn';
     return (
       <main className="screen">
-        <Panel title="Đã vào quán">
-          <p>Xin chào, {name}!</p>
-          <p className="hint">Phần chọn máy chủ và vào quán sẽ có ở bước sau.</p>
-          <Button variant="secondary" onClick={() => void logout()}>
-            Đăng xuất
-          </Button>
-        </Panel>
+        <div className="signed-in-stack">
+          <Panel title="Đã vào quán">
+            <p>Xin chào, {name}!</p>
+            <Button variant="secondary" onClick={() => void logout()}>
+              Đăng xuất
+            </Button>
+          </Panel>
+          <ServerList />
+        </div>
       </main>
     );
   }

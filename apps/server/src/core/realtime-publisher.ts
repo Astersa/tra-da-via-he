@@ -9,6 +9,8 @@ export type ServerPayload<E extends ServerEvent> = Parameters<ServerToClientEven
 export interface RealtimePublisher {
   toUser<E extends ServerEvent>(userId: string, ev: E, p: ServerPayload<E>): void;
   toServer<E extends ServerEvent>(serverId: string, ev: E, p: ServerPayload<E>): void;
+  // Volatile: may be dropped for slow clients. Used for the batched player:moved tick only (§3.4.3).
+  toServerVolatile<E extends ServerEvent>(serverId: string, ev: E, p: ServerPayload<E>): void;
   toServerExcept<E extends ServerEvent>(serverId: string, userId: string, ev: E, p: ServerPayload<E>): void;
   toShopStaff<E extends ServerEvent>(shopId: string, ev: E, p: ServerPayload<E>): void;
   toLobby<E extends ServerEvent>(ev: E, p: ServerPayload<E>): void;

@@ -11,3 +11,4 @@ playwright-report
 test-results
 
 *.tsbuildinfo
+apps/web/e2e/screens/

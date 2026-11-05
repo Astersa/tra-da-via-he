@@ -88,7 +88,7 @@ afterEach(async () => {
 describe('POST /auth/guest', () => {
   it('tạo khách: kind GUEST, username null, có access token, profile và ví số dư 0', async () => {
     const res = await guest('Trà Đá Một');
-    expect(res.status).toBeLessThan(300);
+    expect(res.status).toBe(201);
     expect(() => AuthResSchema.parse(res.body)).not.toThrow();
     expect(res.body.user.kind).toBe('GUEST');
     expect(res.body.user.username).toBeNull();
@@ -149,7 +149,7 @@ describe('POST /auth/guest', () => {
       users: await testPrisma.user.findMany(),
       profiles: await testPrisma.playerProfile.findMany(),
       audit: await testPrisma.auditLog.findMany(),
-    });
+    }, (_key, v: unknown) => (typeof v === 'bigint' ? v.toString() : v));
     expect(dump).not.toContain(LOOPBACK);
     expect(dump).toContain(ipHashOf(LOOPBACK));
   });
@@ -194,7 +194,7 @@ describe('POST /auth/guest', () => {
       await stopApp();
     }
     await startApp();
-    const res = await guest('Khach Sau Khi Khoi Dong');
+    const res = await guest('Khach Sau Khi');
     expect(res.body.error.code).toBe('RATE_LIMITED');
     expect(res.body.error.details.retryAfterMs).toBeGreaterThan(60_000);
   });
@@ -216,6 +216,7 @@ describe('POST /auth/login', () => {
   it('đăng nhập đúng trả accessToken và user REGISTERED', async () => {
     const user = await seedRegistered('nguoi_choi', 'matkhau-dung-1');
     const res = await login('nguoi_choi', 'matkhau-dung-1');
+    expect(res.status).toBe(200);
     expect(() => AuthResSchema.parse(res.body)).not.toThrow();
     expect(res.body.user.id).toBe(user.id);
     expect(res.body.user.kind).toBe('REGISTERED');
@@ -252,7 +253,7 @@ describe('POST /auth/login', () => {
 
   it('khách (GUEST) không đăng nhập được', async () => {
     const created = await guest('Khach Khong Dang Nhap');
-    const res = await login('khach_khong_dang_nhap', 'matkhau-dung-1');
+    const res = await login('khach_khong_dang', 'matkhau-dung-1');
     expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
     expect(created.body.user.username).toBeNull();
   });

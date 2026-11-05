@@ -215,14 +215,18 @@ export const PlayerMovedEvtSchema = z
 export const PlayerLeftEvtSchema = z
   .object({ userId: UuidSchema, reason: SessionEndReasonSchema })
   .strict();
+// §3.4.3: at least one of kind (emote) or state (sit, stand, disconnect, reconnect) is present.
 export const PlayerInteractedEvtSchema = z
   .object({
     userId: UuidSchema,
-    kind: z.enum(["WAVE", "CHEERS", "NOD"]),
+    kind: z.enum(["WAVE", "CHEERS", "NOD"]).optional(),
     seatId: z.string().optional(),
     state: z.enum(["SIT", "STAND", "DISCONNECTED", "RECONNECTED"]).optional(),
   })
-  .strict();
+  .strict()
+  .refine((v) => v.kind !== undefined || v.state !== undefined, {
+    message: "player:interacted needs kind or state",
+  });
 export const WalletUpdatedEvtSchema = WalletViewSchema.extend({
   reason: WalletTxTypeSchema,
 }).strict();

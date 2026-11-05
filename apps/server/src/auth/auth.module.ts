@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { GAME_CONFIG, loadGameConfig } from '../core/game-config.js';
 import { InMemoryRateLimiter } from '../core/rate-limiter.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
@@ -18,7 +17,6 @@ import { RefreshTokenService } from './refresh-token.service.js';
     IpRateLimitGuard,
     // Factories, not values: each app instance gets its own limiter (process-local state, §3.9).
     { provide: RATE_LIMITER, useFactory: () => new InMemoryRateLimiter() },
-    { provide: GAME_CONFIG, useFactory: () => loadGameConfig(process.env) },
   ],
 })
 export class AuthModule {}

@@ -1563,7 +1563,7 @@ Code do agent **Haiku effort low** thực hiện; mỗi agent bắt đầu khôn
 **Quy tắc cho executor**
 
 1. Đọc đúng các file và mục được nêu trong "Đọc". §x.y luôn trỏ về file này: `TRA-DA-VIA-HE-MVP-DOCS/IMPLEMENTATION-PLAN.md`.
-2. Chỉ sửa file trong "Phạm vi". Cần sửa file khác thì dừng và báo.
+2. Chỉ sửa file trong "Phạm vi". Cần sửa file khác thì dừng và báo. **Luôn được coi là trong phạm vi, không cần hỏi, nhưng phải liệt kê trong báo cáo:** file test mà card yêu cầu hoặc mà lệnh Verify gọi tới; `package.json` của package dùng dependency và `pnpm-lock.yaml`, nếu version đúng bảng §3.1; thêm dòng export vào `packages/shared/src/index.ts`; thêm dòng import hoặc provider vào `app.module.ts`, `*.module.ts` của module đang làm.
 3. **Không thiết kế.** Chữ ký, tên, mã lỗi đã có trong plan thì chép đúng. Nếu plan thiếu hoặc mâu thuẫn: dừng, báo `BLOCKED: <lý do>`, không tự quyết.
 4. Không thêm dependency ngoài bảng version §3.1. Không thêm tính năng ngoài card. Không có AI, NPC, bot hay đơn giả trong code sản phẩm.
 5. Không dùng `--no-verify`, không bỏ qua test, không viết `it.skip`, không nới assertion để qua test.

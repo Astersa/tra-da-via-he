@@ -1,12 +1,13 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../../src/generated/prisma/client.js';
+import { readPoolMax } from '../../src/core/prisma.service.js';
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) throw new Error('DATABASE_URL is not set; setupFiles should load .env.test');
 
 // Real PostgreSQL on port 5433. No mocks.
 export const testPrisma = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: databaseUrl, max: 5 }),
+  adapter: new PrismaPg({ connectionString: databaseUrl, max: readPoolMax() }),
 });
 
 // TRUNCATE ... CASCADE, not DELETE: the append-only triggers block row-level DELETE.

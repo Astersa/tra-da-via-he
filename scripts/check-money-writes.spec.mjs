@@ -118,6 +118,52 @@ test('positive: raw SQL quoted table name "Wallet" outside economy fails', () =>
   }
 });
 
+test('positive: $transaction inside economy fails (only core/tx.ts may open one)', () => {
+  const root = fixture({
+    'apps/server/src/economy/ledger.service.ts': 'await this.prisma.$transaction(async (tx) => {});\n',
+  });
+  try {
+    const v = findMoneyWriteViolations(root);
+    assert.deepEqual(v, [{ file: 'apps/server/src/economy/ledger.service.ts', line: 1, token: '$transaction' }]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('positive: $transaction in orders fails', () => {
+  const root = fixture({
+    'apps/server/src/orders/sweeper.ts': 'const r = await prisma.$transaction(fn);\n',
+  });
+  try {
+    const v = findMoneyWriteViolations(root);
+    assert.deepEqual(v, [{ file: 'apps/server/src/orders/sweeper.ts', line: 1, token: '$transaction' }]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('negative: $transaction inside apps/server/src/core/tx.ts is allowed', () => {
+  const root = fixture({
+    'apps/server/src/core/tx.ts': 'return prisma.$transaction(fn, opts);\n',
+  });
+  try {
+    assert.deepEqual(findMoneyWriteViolations(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('negative: $transaction in test folders is not checked', () => {
+  const root = fixture({
+    'apps/server/test/helpers/db.ts': 'await testPrisma.$transaction(fn);\n',
+  });
+  try {
+    assert.deepEqual(findMoneyWriteViolations(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test('positive: raw SQL quoted table name "ShopTreasury" outside economy fails', () => {
   const root = fixture({
     'apps/server/src/shops/x.ts': 'await db.$executeRaw`UPDATE "ShopTreasury" SET balance = 0`;\n',

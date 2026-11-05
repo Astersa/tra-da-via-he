@@ -252,7 +252,7 @@ describe('POST /auth/login', () => {
   });
 
   it('khách (GUEST) không đăng nhập được', async () => {
-    const created = await guest('Khach Khong Dang Nhap');
+    const created = await guest('Khach Khong Dang');
     const res = await login('khach_khong_dang', 'matkhau-dung-1');
     expect(res.body.error.code).toBe('INVALID_CREDENTIALS');
     expect(created.body.user.username).toBeNull();

@@ -1,0 +1,103 @@
+/* Chỉ dùng biến token từ theme/tokens.css (§3.8). */
+.chat-panel {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 5;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: min(320px, calc(100vw - 32px));
+  max-height: 40vh;
+  min-width: 0;
+  padding: 10px;
+  border: 3px solid var(--brown-900);
+  border-radius: 16px;
+  background: var(--panel);
+  color: var(--brown-900);
+  font-family: 'Be Vietnam Pro', system-ui, sans-serif;
+}
+
+.chat-panel *,
+.chat-panel *::before,
+.chat-panel *::after {
+  box-sizing: border-box;
+}
+
+.chat-log {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.chat-line {
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.chat-name {
+  margin-right: 4px;
+  font-weight: 700;
+}
+
+.chat-error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--brown-900);
+  overflow-wrap: anywhere;
+}
+
+.chat-form {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chat-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 2px solid var(--brown-900);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--brown-900);
+  font: inherit;
+}
+
+.chat-send {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 2px solid var(--brown-900);
+  border-radius: 12px;
+  background: var(--awning-orange);
+  color: var(--brown-900);
+  font: inherit;
+  cursor: pointer;
+}
+
+.chat-send:disabled,
+.chat-input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .chat-panel {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-height: 35vh;
+  }
+}

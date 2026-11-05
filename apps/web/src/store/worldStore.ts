@@ -59,6 +59,13 @@ export interface WorldStore extends WorldData {
   // Đứng dậy qua player:stand. Cùng quy ước với sitSeat.
   standUp: () => Promise<boolean>;
   clearActionError: () => void;
+  // Tin chat mới nhất nhận qua chat:message (dùng để vẽ bong bóng). Không đổi khi chỉ nạp lại recentChat.
+  lastChat: ChatMessage | null;
+  // Lỗi của lần gửi chat gần nhất. null khi không có lỗi.
+  chatError: { code: string; message: string } | null;
+  // Gửi chat:send. true khi server nhận; lỗi thì đặt chatError và trả false (ô nhập giữ nguyên nội dung).
+  sendChat: (text: string, clientMsgId: string) => Promise<boolean>;
+  clearChatError: () => void;
 }
 
 const EMPTY_DATA: WorldData = {
@@ -84,6 +91,8 @@ const INITIAL = {
   error: null as WorldStore['error'],
   positionSync: 0,
   actionError: null as WorldStore['actionError'],
+  lastChat: null as ChatMessage | null,
+  chatError: null as WorldStore['chatError'],
 };
 
 const MAX_CHAT = 50;
@@ -127,7 +136,24 @@ export const useWorldStore = create<WorldStore>()((set) => ({
   sitSeat: (seatId) => seatAction(seatId),
   standUp: () => seatAction(null),
   clearActionError: () => setWorld({ actionError: null }),
+  sendChat: (text, clientMsgId) => chatAction(text, clientMsgId),
+  clearChatError: () => setWorld({ chatError: null }),
 }));
+
+// chat:send với clientMsgId do người gọi sinh. Không tự thử lại: gửi lại sẽ tạo yêu cầu mới.
+async function chatAction(text: string, clientMsgId: string): Promise<boolean> {
+  const st = useWorldStore.getState();
+  const s = activeSocket;
+  if (!s || !s.connected || st.status !== 'joined') return false;
+  setWorld({ chatError: null });
+  const res = await emitAck(s, 'chat:send', { text, clientMsgId }, { timeoutMs: ACTION_TIMEOUT_MS, retries: 0 });
+  if (!isCurrent(s)) return false;
+  if (!res.ok) {
+    setWorld({ chatError: { code: res.error.code, message: res.error.message } });
+    return false;
+  }
+  return true;
+}
 
 // player:sit (seatId) hoặc player:stand (null). Thành công thì cập nhật ghế của mình ngay, không chờ event.
 async function seatAction(seatId: string | null): Promise<boolean> {
@@ -383,7 +409,10 @@ function bindSocket(s: TypedSocket): void {
   listen(s, 'chat:message', (msg) => {
     const st = useWorldStore.getState();
     if (!st.self) return;
-    setWorld({ recentChat: [...st.recentChat.filter((m) => m.id !== msg.id), msg].slice(-MAX_CHAT) });
+    setWorld({
+      recentChat: [...st.recentChat.filter((m) => m.id !== msg.id), msg].slice(-MAX_CHAT),
+      lastChat: msg,
+    });
   });
   listen(s, 'shop:updated', (shop) => {
     const st = useWorldStore.getState();

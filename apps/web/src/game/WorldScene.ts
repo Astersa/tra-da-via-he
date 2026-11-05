@@ -3,6 +3,7 @@ import { AvatarIdSchema, getSeats, street01Map, type PlayerView } from '@tdvh/sh
 import { useWorldStore } from '../store/worldStore';
 import { DEFAULT_AVATAR, SIT_COLUMN, WALK_COLUMNS, WALK_FRAME_MS, frameFor } from './avatar';
 import { bridge } from './bridge';
+import { ChatBubbles } from './bubbles';
 import { RemotePlayers } from './RemotePlayers';
 import { nearestFreeSeat, seatPrompt } from './remote';
 import {
@@ -62,6 +63,8 @@ export class WorldScene extends Phaser.Scene {
   private toast: Phaser.GameObjects.Text | null = null;
   private toastTimer: Phaser.Time.TimerEvent | null = null;
   private unsubscribeErrors: (() => void) | null = null;
+  private bubbles!: ChatBubbles;
+  private unsubscribeChat: (() => void) | null = null;
 
   constructor() {
     super({ key: WorldScene.KEY });
@@ -105,10 +108,17 @@ export class WorldScene extends Phaser.Scene {
     this.unsubscribeErrors = useWorldStore.subscribe((st, prev) => {
       if (st.actionError && st.actionError !== prev.actionError) this.showToast(st.actionError.message);
     });
+    this.bubbles = new ChatBubbles(this, (id) => this.positionOf(id));
+    this.unsubscribeChat = useWorldStore.subscribe((st, prev) => {
+      const msg = st.lastChat;
+      if (msg && msg !== prev.lastChat) this.bubbles.show(msg.userId, msg.text);
+    });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.unsubscribeSync?.();
       this.unsubscribePlayers?.();
       this.unsubscribeErrors?.();
+      this.unsubscribeChat?.();
+      this.bubbles.destroy();
       this.remotes.destroy();
     });
 
@@ -121,6 +131,7 @@ export class WorldScene extends Phaser.Scene {
 
   update(time: number, delta: number): void {
     this.remotes.update(time, delta);
+    this.bubbles.update();
     if (!this.avatar) return;
 
     let v: Vec = { x: 0, y: 0 };
@@ -168,6 +179,14 @@ export class WorldScene extends Phaser.Scene {
     }
     const seat = nearestFreeSeat(SEATS, this.pos, st.takenSeats);
     if (seat) void st.sitSeat(seat.id);
+  }
+
+  // Vị trí đặt bong bóng: của mình là vị trí đang vẽ, người khác là vị trí server đã biết.
+  private positionOf(userId: string): { x: number; y: number } | null {
+    const st = useWorldStore.getState();
+    if (st.self?.userId === userId) return this.pos;
+    const p = st.players[userId];
+    return p ? { x: p.x, y: p.y } : null;
   }
 
   private showToast(message: string): void {

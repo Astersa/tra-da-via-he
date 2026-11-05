@@ -532,3 +532,52 @@ ALTER TABLE "ShopOrderItem" ADD CONSTRAINT "ShopOrderItem_productId_fkey" FOREIG
 
 -- AddForeignKey
 ALTER TABLE "ShopOrderEvent" ADD CONSTRAINT "ShopOrderEvent_orderId_fkey" FOREIGN KEY ("orderId") REFERENCES "ShopOrder"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- ===== RAW SQL: các ràng buộc Prisma schema không khai báo (xem §3.2.3) =====
+-- Partial unique
+CREATE UNIQUE INDEX "ServerSession_one_active_per_user" ON "ServerSession"("userId") WHERE "status" = 'ACTIVE';
+CREATE UNIQUE INDEX "ShopEmployee_one_active_per_user"  ON "ShopEmployee"("userId")  WHERE "status" = 'ACTIVE';
+CREATE UNIQUE INDEX "EmployeeApplication_one_pending"   ON "EmployeeApplication"("userId","shopId") WHERE "status" = 'PENDING';
+CREATE UNIQUE INDEX "Shop_one_live_per_plot"            ON "Shop"("plotId")  WHERE "status" <> 'CLOSED';
+CREATE UNIQUE INDEX "Shop_one_live_per_owner"           ON "Shop"("ownerId") WHERE "status" <> 'CLOSED' AND "ownerId" IS NOT NULL;
+CREATE UNIQUE INDEX "Shop_default_slot_per_server"      ON "Shop"("serverId","defaultSlot") WHERE "type" = 'DEFAULT';
+-- Partial index phục vụ truy vấn
+CREATE INDEX "ShopOrder_open_by_shop"   ON "ShopOrder"("shopId","createdAt") WHERE "status" IN ('PENDING','ACCEPTED');
+CREATE INDEX "ShopOrder_pending_expiry" ON "ShopOrder"("expiresAt")          WHERE "status" = 'PENDING';
+CREATE INDEX "ShopOrder_accept_expiry"  ON "ShopOrder"("acceptExpiresAt")    WHERE "status" = 'ACCEPTED';
+-- CHECK
+ALTER TABLE "User"
+  ADD CONSTRAINT "User_kind_credentials" CHECK (
+    ("kind" = 'GUEST' AND "username" IS NULL AND "passwordHash" IS NULL)
+    OR ("kind" = 'REGISTERED' AND "username" IS NOT NULL AND "passwordHash" IS NOT NULL));
+ALTER TABLE "Wallet"
+  ADD CONSTRAINT "Wallet_balance_nonneg" CHECK ("balance" >= 0),
+  ADD CONSTRAINT "Wallet_held_valid"     CHECK ("heldBalance" >= 0 AND "heldBalance" <= "balance");
+ALTER TABLE "ShopTreasury"
+  ADD CONSTRAINT "ShopTreasury_balance_nonneg" CHECK ("balance" >= 0);
+ALTER TABLE "Shop"
+  ADD CONSTRAINT "Shop_type_owner_slot" CHECK (
+    ("type" = 'DEFAULT' AND "ownerId" IS NULL AND "defaultSlot" BETWEEN 1 AND 3)
+    OR ("type" = 'PLAYER_OWNED' AND "ownerId" IS NOT NULL AND "defaultSlot" IS NULL));
+ALTER TABLE "ShopOrder"
+  ADD CONSTRAINT "ShopOrder_no_self_purchase" CHECK ("customerId" <> "ownerIdSnapshot"),
+  ADD CONSTRAINT "ShopOrder_no_self_handle"   CHECK ("handlerId" <> "customerId"),
+  ADD CONSTRAINT "ShopOrder_handler_required" CHECK ("status" NOT IN ('ACCEPTED','COMPLETED') OR "handlerId" IS NOT NULL),
+  ADD CONSTRAINT "ShopOrder_amounts_valid"    CHECK ("totalAmount" > 0 AND "supplyCostTotal" >= 0 AND "commissionBpsSnapshot" BETWEEN 0 AND 10000),
+  ADD CONSTRAINT "ShopOrder_settlement_valid" CHECK ("status" <> 'COMPLETED' OR (
+    "commissionAmount" IS NOT NULL AND "profitAmount" IS NOT NULL
+    AND "commissionAmount" >= 0 AND "profitAmount" >= 0
+    AND "supplyCostTotal" + "commissionAmount" + "profitAmount" = "totalAmount"));
+ALTER TABLE "ShopOrderItem"
+  ADD CONSTRAINT "ShopOrderItem_valid" CHECK ("quantity" BETWEEN 1 AND 10 AND "unitPriceSnapshot" > 0 AND "unitSupplyCostSnapshot" >= 0);
+ALTER TABLE "Product"
+  ADD CONSTRAINT "Product_price_valid" CHECK ("supplyCost" >= 0 AND "minPrice" > 0 AND "minPrice" <= "defaultPrice" AND "defaultPrice" <= "maxPrice");
+ALTER TABLE "GameServer"
+  ADD CONSTRAINT "GameServer_caps_valid" CHECK ("softCap" > 0 AND "softCap" <= "hardCap");
+-- Ledger và log bất biến
+CREATE FUNCTION forbid_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN RAISE EXCEPTION '% is append-only', TG_TABLE_NAME USING ERRCODE = 'restrict_violation'; END $$;
+CREATE TRIGGER "WalletTransaction_immutable" BEFORE UPDATE OR DELETE ON "WalletTransaction" FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
+CREATE TRIGGER "ShopTransaction_immutable"   BEFORE UPDATE OR DELETE ON "ShopTransaction"   FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
+CREATE TRIGGER "ShopOrderEvent_immutable"    BEFORE UPDATE OR DELETE ON "ShopOrderEvent"    FOR EACH ROW EXECUTE FUNCTION forbid_mutation();
+CREATE TRIGGER "AuditLog_immutable"          BEFORE UPDATE OR DELETE ON "AuditLog"          FOR EACH ROW EXECUTE FUNCTION forbid_mutation();

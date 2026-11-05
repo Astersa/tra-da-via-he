@@ -81,6 +81,14 @@ export class WorldScene extends Phaser.Scene {
 
     this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
     this.cameras.main.setZoom(1.5);
+    // Canvas RESIZE: camera và chữ thông báo theo kích thước mới (vẫn theo nhân vật nhờ startFollow).
+    const onResize = (gameSize: Phaser.Structs.Size) => {
+      if (!this.sys.isActive()) return;
+      this.cameras.main.setSize(gameSize.width, gameSize.height);
+      this.toast?.setX(gameSize.width / 2);
+    };
+    this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
+    this.cameras.main.setSize(this.scale.width, this.scale.height);
 
     // addKeys(..., false): không chặn phím mặc định, để ô chat vẫn gõ được.
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E', false) as unknown as KeyMap;
@@ -88,11 +96,16 @@ export class WorldScene extends Phaser.Scene {
       this.target = { x: p.worldX, y: p.worldY };
     });
 
-    this.unsubscribeSync = bridge.on('world:position-sync', (p) => this.applySync(p));
+    // Cùng lý do với subscribe bên dưới: scene đã hủy nhưng listener còn đến khi SHUTDOWN.
+    this.unsubscribeSync = bridge.on('world:position-sync', (p) => {
+      if (this.sys.isActive()) this.applySync(p);
+    });
     this.remotes = new RemotePlayers(this);
     this.remotes.sync(useWorldStore.getState().players);
     this.unsubscribePlayers = useWorldStore.subscribe((st, prev) => {
-      if (st.players !== prev.players) this.remotes.sync(st.players);
+      // Phaser hủy scene ở khung hình sau game.destroy (GameView unmount, ví dụ khi đăng xuất). Trong khoảng đó
+      // subscribe vẫn còn và displayList đã null: bỏ qua khi scene không còn chạy, nếu không setState của joinWorld ném lỗi và màn vào quán bị kẹt.
+      if (st.players !== prev.players && this.sys.isActive()) this.remotes.sync(st.players);
     });
     this.prompt = this.add
       .text(0, 0, '', { fontFamily: '"Be Vietnam Pro", sans-serif', fontSize: '12px', color: '#482818', stroke: '#F8E8D8', strokeThickness: 3 })
@@ -106,14 +119,15 @@ export class WorldScene extends Phaser.Scene {
       .setDepth(20)
       .setVisible(false);
     this.unsubscribeErrors = useWorldStore.subscribe((st, prev) => {
-      if (st.actionError && st.actionError !== prev.actionError) this.showToast(st.actionError.message);
+      if (st.actionError && st.actionError !== prev.actionError && this.sys.isActive()) this.showToast(st.actionError.message);
     });
     this.bubbles = new ChatBubbles(this, (id) => this.positionOf(id));
     this.unsubscribeChat = useWorldStore.subscribe((st, prev) => {
       const msg = st.lastChat;
-      if (msg && msg !== prev.lastChat) this.bubbles.show(msg.userId, msg.text);
+      if (msg && msg !== prev.lastChat && this.sys.isActive()) this.bubbles.show(msg.userId, msg.text);
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
       this.unsubscribeSync?.();
       this.unsubscribePlayers?.();
       this.unsubscribeErrors?.();

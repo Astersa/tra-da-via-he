@@ -66,3 +66,14 @@ export function LogoutButton() {
     </div>
   );
 }
+
+// Đăng xuất trong màn chơi: LogoutButton trước đây chỉ có ở màn chọn máy chủ, nên người đã vào quán không thoát được.
+export function HudLogout() {
+  const user = useAuthStore((s) => s.user);
+  if (!user) return null;
+  return (
+    <div className="hud-logout">
+      <LogoutButton />
+    </div>
+  );
+}

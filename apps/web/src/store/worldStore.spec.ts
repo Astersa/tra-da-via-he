@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PlayerView, WorldState } from '@tdvh/shared';
-import { useWorldStore } from './worldStore';
+import { restoreWorld, useWorldStore } from './worldStore';
+import { useServerStore } from './serverStore';
 import { createSocket, type TypedSocket } from '../socket/createSocket';
 import { refreshSession, setAccessToken } from '../api/client';
 import { useConnectivityStore } from './connectivityStore';
@@ -428,5 +429,74 @@ describe('cold start qua socket (§3.10.6)', () => {
     useWorldStore.getState().disconnectWorld();
     await tick(600_000);
     expect(pings()).toBe(2);
+  });
+});
+
+describe('worldStore: khôi phục sau F5', () => {
+  let saved: Map<string, string>;
+
+  beforeEach(() => {
+    saved = new Map();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => saved.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        saved.set(k, v);
+      },
+      removeItem: (k: string) => {
+        saved.delete(k);
+      },
+    });
+    useServerStore.setState({ joinError: null });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('có bản lưu thì nối lại đúng máy chủ, world:join kèm resumeSessionId', () => {
+    saved.set('tdvh.world', JSON.stringify({ serverId: SERVER, sessionId: SESSION }));
+    expect(restoreWorld()).toBe(true);
+    expect(useWorldStore.getState().status).toBe('connecting');
+    fake.fire('connect');
+    expect(fake.lastEmit('world:join').req).toEqual({ serverId: SERVER, resumeSessionId: SESSION });
+  });
+
+  it('không có bản lưu thì không nối và giữ idle', () => {
+    expect(restoreWorld()).toBe(false);
+    expect(useWorldStore.getState().status).toBe('idle');
+    expect(fake.connectCalls).toBe(0);
+  });
+
+  it('đã có world đang chạy thì không nối lại', async () => {
+    await joinedWorld();
+    saved.set('tdvh.world', JSON.stringify({ serverId: SERVER, sessionId: SESSION }));
+    expect(restoreWorld()).toBe(false);
+  });
+
+  it('SERVER_FULL khi khôi phục: xóa bản lưu, về màn chọn máy chủ kèm lý do', async () => {
+    saved.set('tdvh.world', JSON.stringify({ serverId: SERVER, sessionId: SESSION }));
+    restoreWorld();
+    fake.fire('connect');
+    fake.lastEmit('world:join').ack?.({ ok: false, error: { code: 'SERVER_FULL', message: 'Máy chủ đã đầy.', retryable: false } });
+    await tick();
+    expect(useWorldStore.getState().status).toBe('idle');
+    expect(saved.has('tdvh.world')).toBe(false);
+    expect(useServerStore.getState().joinError).toMatchObject({ code: 'SERVER_FULL' });
+  });
+
+  it('SERVER_NOT_ACTIVE khi vào bằng thao tác thường cũng về màn chọn, không để lỗi trong quán', async () => {
+    useWorldStore.getState().connect(SERVER);
+    fake.fire('connect');
+    fake.lastEmit('world:join').ack?.({ ok: false, error: { code: 'SERVER_NOT_ACTIVE', message: 'Đang đóng.', retryable: false } });
+    await tick();
+    expect(useWorldStore.getState().status).toBe('idle');
+    expect(useServerStore.getState().joinError).toMatchObject({ code: 'SERVER_NOT_ACTIVE' });
+  });
+
+  it('đăng xuất xóa bản lưu', async () => {
+    await joinedWorld();
+    expect(saved.has('tdvh.world')).toBe(true);
+    setAccessToken(null);
+    expect(saved.has('tdvh.world')).toBe(false);
   });
 });

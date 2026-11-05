@@ -37,3 +37,11 @@
 .account-badge-button {
   width: 100%;
 }
+
+.hud-logout {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  z-index: 5;
+  width: min(240px, calc(100vw - 16px));
+}

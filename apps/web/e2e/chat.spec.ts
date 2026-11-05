@@ -1,4 +1,7 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { enterServer } from './helpers';
+
+const SERVER_NAME = 'Quán E2E';
 
 interface ServerEvent {
   name: string;
@@ -28,14 +31,9 @@ function watchFrames(page: Page): { received: ServerEvent[]; sent: ServerEvent[]
   return { received, sent };
 }
 
-// Vào máy chủ đầu tiên trong danh sách, cùng quy ước với two-players.spec.ts.
+// Vào máy chủ 'Quán E2E', cùng quy ước với two-players.spec.ts. Xử lý RATE_LIMITED trong helpers.ts.
 async function enter(page: Page, name: string): Promise<void> {
-  await page.goto('/');
-  await page.getByLabel('Tên của bạn').fill(name);
-  await page.getByRole('button', { name: 'Vào uống trà đá' }).click();
-  await page.locator('.server-card').first().getByRole('button', { name: 'Vào máy chủ này' }).click();
-  await expect(page.locator('.game-host canvas')).toBeVisible();
-  await expect(page.locator('.game-overlay')).toHaveCount(0, { timeout: 15_000 });
+  await enterServer(page, name, SERVER_NAME);
 }
 
 test('A chat, B thấy trong panel; gõ trong ô chat không đi, không ngồi', async ({ browser }: { browser: Browser }) => {

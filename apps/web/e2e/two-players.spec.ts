@@ -1,5 +1,8 @@
 import { join } from 'node:path';
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { enterServer } from './helpers';
+
+const SERVER_NAME = 'Quán E2E';
 
 interface ServerEvent {
   name: string;
@@ -9,6 +12,21 @@ interface ServerEvent {
 // Ghế P2-S3 trong street-01 (packages/shared/src/map/street-01.json). Spawn (784, 432) cách ghế này khoảng 132 px.
 const SEAT = { id: 'P2-S3', x: 752, y: 304 };
 const SEAT_REACH = 48;
+// Điểm click cách ghế 26 px về phía dưới: nằm trong tầm ngồi (48 px) và không trùng ghế.
+const SEAT_TAP_OFFSET_Y = 26;
+
+// Canvas RESIZE (createGame): kích thước logic = thuộc tính width/height của canvas, camera zoom 1.5 và theo nhân vật.
+// Đổi điểm world sang vị trí trong canvas rồi click; WorldScene đặt đích = tọa độ world của điểm đó.
+const CAMERA_ZOOM = 1.5;
+async function clickWorld(page: Page, from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
+  const canvas = page.locator('.game-host canvas');
+  const box = await canvas.boundingBox();
+  expect(box).not.toBeNull();
+  const logical = await canvas.evaluate((c: HTMLCanvasElement) => ({ w: c.width, h: c.height }));
+  const lx = logical.w / 2 + (to.x - from.x) * CAMERA_ZOOM;
+  const ly = logical.h / 2 + (to.y - from.y) * CAMERA_ZOOM;
+  await canvas.click({ position: { x: (lx / logical.w) * box!.width, y: (ly / logical.h) * box!.height } });
+}
 
 // Mọi frame socket.io dạng "42[name, data]": event server gửi tới trang (received) hoặc client gửi đi (sent).
 function watchFrames(page: Page): { received: ServerEvent[]; sent: ServerEvent[] } {
@@ -33,17 +51,14 @@ function watchFrames(page: Page): { received: ServerEvent[]; sent: ServerEvent[]
   return { received, sent };
 }
 
-// Vào đúng máy chủ đầu tiên trong danh sách (không dùng Quick Join, để cả hai cùng một server).
+// Vào đúng máy chủ 'Quán E2E' (không dùng Quick Join, để cả hai cùng một server). Xử lý RATE_LIMITED trong helpers.ts.
 async function enter(page: Page, name: string): Promise<void> {
-  await page.goto('/');
-  await page.getByLabel('Tên của bạn').fill(name);
-  await page.getByRole('button', { name: 'Vào uống trà đá' }).click();
-  await page.locator('.server-card').first().getByRole('button', { name: 'Vào máy chủ này' }).click();
-  await expect(page.locator('.game-host canvas')).toBeVisible();
-  await expect(page.locator('.game-overlay')).toHaveCount(0, { timeout: 15_000 });
+  await enterServer(page, name, SERVER_NAME);
 }
 
 test('B thấy A vào, đi tới ghế, ngồi, đứng, rồi rời', async ({ browser }: { browser: Browser }) => {
+  // Bước cuối chờ reconnectGraceSeconds (30 s, §3.9) rồi mới có player:left: cần lâu hơn timeout mặc định 30 s.
+  test.setTimeout(120_000);
   const suffix = `${Date.now() % 100_000}${Math.floor(Math.random() * 1000)}`;
   const ctxA = await browser.newContext();
   const ctxB = await browser.newContext();
@@ -60,26 +75,46 @@ test('B thấy A vào, đi tới ghế, ngồi, đứng, rồi rời', async ({ 
 
   const joinedA = () =>
     framesB.received.find((e) => e.name === 'player:joined' && (e.data as { displayName: string }).displayName === nameA)
-      ?.data as { userId: string } | undefined;
+      ?.data as { userId: string; x: number; y: number } | undefined;
   await expect.poll(() => joinedA() !== undefined, { timeout: 15_000 }).toBe(true);
   const userIdA = joinedA()!.userId;
   const interactedA = (state: string) =>
     framesB.received.find((e) => e.name === 'player:interacted' && (e.data as { userId: string; state?: string }).userId === userIdA && (e.data as { state?: string }).state === state)
       ?.data as { seatId?: string } | undefined;
 
-  // A đi lên bằng phím W tới khi vị trí gửi đi nằm trong tầm ngồi của ghế.
+  // A click (click-to-move) tới ô cạnh ghế. Vị trí xuất phát của A lấy từ player:joined mà B nhận được.
+  const spawnA = joinedA()!;
+  await clickWorld(pageA, spawnA, { x: SEAT.x, y: SEAT.y + SEAT_TAP_OFFSET_Y });
+
+  // Chờ tới khi A đứng yên trong tầm ngồi: vị trí gửi đi không đổi trong 400 ms (server nhận player:move khi có thay đổi).
   const lastSentA = () => framesA.sent.filter((e) => e.name === 'player:move').at(-1)?.data as { x: number; y: number } | undefined;
   const inReach = () => {
     const p = lastSentA();
     return p !== undefined && Math.hypot(p.x - SEAT.x, p.y - SEAT.y) <= SEAT_REACH;
   };
-  await pageA.keyboard.down('w');
-  // Poll cố định 50 ms: cửa sổ tầm ngồi chỉ khoảng 0.4 s khi đi thẳng.
-  await expect.poll(inReach, { timeout: 10_000, intervals: [50] }).toBe(true);
-  await pageA.keyboard.up('w');
+  let lastKey = '';
+  let stillSince = Date.now();
+  await expect
+    .poll(
+      () => {
+        const p = lastSentA();
+        const key = p ? `${p.x},${p.y}` : '';
+        if (key !== lastKey) {
+          lastKey = key;
+          stillSince = Date.now();
+        }
+        return Date.now() - stillSince >= 400 && inReach();
+      },
+      { timeout: 15_000, intervals: [100] },
+    )
+    .toBe(true);
 
-  // A nhấn E: ngồi xuống ghế gần nhất. B nhận player:interacted SIT đúng ghế.
-  await pageA.keyboard.press('e');
+  // A nhấn E khi đã ở tầm ghế: ngồi xuống ghế gần nhất. Nếu server chưa nhận, thử E lại tối đa 3 lần (không nhấn lại khi đã có SIT).
+  for (let i = 0; i < 3 && interactedA('SIT') === undefined; i++) {
+    await pageA.keyboard.press('e');
+    await expect.poll(() => interactedA('SIT') !== undefined, { timeout: 1_500 }).toBe(true).catch(() => undefined);
+  }
+  // B nhận player:interacted SIT đúng ghế.
   await expect.poll(() => interactedA('SIT')?.seatId ?? null, { timeout: 10_000 }).toBe(SEAT.id);
   await expect(pageA.locator('.game-overlay')).toHaveCount(0);
   await pageB.screenshot({ path: join(import.meta.dirname, 'screens', 'two-players.png') });

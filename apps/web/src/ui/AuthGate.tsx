@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useConnectivityStore } from '../store/connectivityStore';
+import { restoreWorld } from '../store/worldStore';
 import { ColdStartScreen } from './ColdStartScreen';
 import { LogoutButton } from './AccountBadge';
 import { Button, Panel } from './components';
@@ -20,6 +21,11 @@ export function AuthGate() {
   useEffect(() => {
     void bootstrap();
   }, [bootstrap]);
+
+  // Đã đăng nhập (kể cả sau F5) mà tab còn bản lưu máy chủ: nối lại thẳng vào quán, không hiện màn chọn máy chủ.
+  useEffect(() => {
+    if (status === 'signed-in') restoreWorld();
+  }, [status]);
 
   // Khi đã bỏ chờ (boot-error) thì để màn lỗi có nút "Thử lại" của bootstrap, không hiện màn chờ.
   if (status !== 'boot-error' && waking) return <ColdStartScreen />;

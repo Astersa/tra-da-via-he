@@ -14,6 +14,13 @@
   display: block;
 }
 
+/* Điện thoại: panel chat nằm dưới (ui/ChatPanel.css, tối đa 35vh), vùng chơi chừa chỗ để không che nhân vật. */
+@media (max-width: 600px) {
+  .game-host {
+    bottom: 35vh;
+  }
+}
+
 .game-overlay {
   position: absolute;
   left: 50%;

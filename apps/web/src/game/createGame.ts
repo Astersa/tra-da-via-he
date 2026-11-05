@@ -6,12 +6,10 @@ export function createGame(parent: HTMLElement): Phaser.Game {
   return new Phaser.Game({
     type: Phaser.AUTO,
     parent,
-    width: 960,
-    height: 540,
     backgroundColor: '#d8a878',
+    // RESIZE: canvas lấp đầy vùng chơi (.game-host); kích thước logic = pixel CSS, WorldScene nhận sự kiện resize.
     scale: {
-      mode: Phaser.Scale.FIT,
-      autoCenter: Phaser.Scale.CENTER_BOTH,
+      mode: Phaser.Scale.RESIZE,
     },
     scene: [PreloadScene, WorldScene],
   });

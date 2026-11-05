@@ -11,7 +11,8 @@ import {
   type WorldState,
 } from '@tdvh/shared';
 import { create } from 'zustand';
-import { getAccessToken, onSessionLost, onTokenChange, refreshSession } from '../api/client';
+import { ApiError, getAccessToken, onSessionLost, onTokenChange, refreshSession, type ClientErrorCode } from '../api/client';
+import { useServerStore } from './serverStore';
 import { createSocket, type TypedSocket } from '../socket/createSocket';
 import { emitAck } from '../socket/emitAck';
 import { startKeepAwake } from '../socket/keepAwake';
@@ -342,6 +343,7 @@ async function joinWorld(s: TypedSocket): Promise<void> {
   if (!isCurrent(s)) return;
   if (!res.ok) {
     if (res.error.retryable) scheduleRetry(s);
+    else if (JOIN_REJECT_CODES.has(res.error.code)) leaveToSelection(res.error.code, res.error.message);
     else failWorld(res.error.code, res.error.message);
     return;
   }
@@ -359,6 +361,24 @@ async function joinWorld(s: TypedSocket): Promise<void> {
 
 function failWorld(code: string, message: string): void {
   setWorld({ status: 'error', error: { code, message } });
+}
+
+// Máy chủ không còn cho vào: bỏ bản lưu, về màn chọn máy chủ và báo lý do ở đó.
+const JOIN_REJECT_CODES = new Set(['SERVER_NOT_FOUND', 'SERVER_NOT_ACTIVE', 'SERVER_FULL']);
+function leaveToSelection(code: string, message: string): void {
+  clearResume();
+  disconnectWorld();
+  useServerStore.setState({ joinError: new ApiError(code as ClientErrorCode, message, 409) });
+}
+
+// Sau khi đã đăng nhập (kể cả F5): nếu tab này đã vào quán và còn bản lưu thì nối lại đúng máy chủ đó,
+// world:join kèm resumeSessionId. Trả false khi không có gì để khôi phục.
+export function restoreWorld(): boolean {
+  if (useWorldStore.getState().status !== 'idle') return false;
+  const saved = loadResumeRecord();
+  if (!saved) return false;
+  useWorldStore.getState().connect(saved.serverId);
+  return true;
 }
 
 function bindSocket(s: TypedSocket): void {
@@ -591,15 +611,22 @@ function saveResume(serverId: string, sessionId: string): void {
   }
 }
 
-function loadResume(serverId: string): string | undefined {
+function loadResumeRecord(): { serverId: string; sessionId: string } | null {
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    if (!raw) return undefined;
+    if (!raw) return null;
     const value = JSON.parse(raw) as { serverId?: unknown; sessionId?: unknown };
-    return value.serverId === serverId && typeof value.sessionId === 'string' ? value.sessionId : undefined;
+    return typeof value.serverId === 'string' && typeof value.sessionId === 'string'
+      ? { serverId: value.serverId, sessionId: value.sessionId }
+      : null;
   } catch {
-    return undefined;
+    return null;
   }
+}
+
+function loadResume(serverId: string): string | undefined {
+  const saved = loadResumeRecord();
+  return saved && saved.serverId === serverId ? saved.sessionId : undefined;
 }
 
 function clearResume(): void {

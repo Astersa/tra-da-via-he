@@ -1,4 +1,4 @@
-import { AccountBadge } from './ui/AccountBadge';
+import { AccountBadge, HudLogout } from './ui/AccountBadge';
 import { AuthGate } from './ui/AuthGate';
 import { ChatPanel } from './ui/ChatPanel';
 import { UpgradeDialog } from './ui/UpgradeDialog';
@@ -24,6 +24,7 @@ export function App() {
           <GameView />
           <ChatPanel />
           <AccountBadge />
+          <HudLogout />
           {waking && <ColdStartScreen />}
         </>
       )}

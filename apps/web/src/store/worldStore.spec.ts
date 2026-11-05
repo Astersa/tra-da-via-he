@@ -500,3 +500,143 @@ describe('worldStore: khôi phục sau F5', () => {
     expect(saved.has('tdvh.world')).toBe(false);
   });
 });
+
+describe('worldStore: đổi máy chủ (server:switch, M1-E5-T10)', () => {
+  const TARGET = '00000000-0000-4000-8000-0000000000a2';
+  const SESSION_B = '00000000-0000-4000-8000-0000000000b2';
+  let saved: Map<string, string>;
+
+  beforeEach(() => {
+    saved = new Map();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k: string) => saved.get(k) ?? null,
+      setItem: (k: string, v: string) => {
+        saved.set(k, v);
+      },
+      removeItem: (k: string) => {
+        saved.delete(k);
+      },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('thành công: thay state bằng server đích, ghi lại bản lưu, không gửi world:join', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().switchServer(TARGET);
+    expect(fake.lastEmit('server:switch').req).toEqual({ targetServerId: TARGET });
+    expect(useWorldStore.getState().switching).toBe(true);
+    fake.lastEmit('server:switch').ack?.({
+      ok: true,
+      data: worldState({ serverId: TARGET, sessionId: SESSION_B, players: [player(USER, 'Lan', 10, 10)] }),
+    });
+    await expect(p).resolves.toBe(true);
+    const st = useWorldStore.getState();
+    expect(st.status).toBe('joined');
+    expect(st.serverId).toBe(TARGET);
+    expect(st.sessionId).toBe(SESSION_B);
+    expect(st.players).toEqual({});
+    expect(st.switching).toBe(false);
+    expect(st.switchError).toBeNull();
+    expect(JSON.parse(saved.get('tdvh.world') ?? '{}')).toEqual({ serverId: TARGET, sessionId: SESSION_B });
+    expect(fake.emitted.filter((e) => e.event === 'world:join')).toHaveLength(1);
+  });
+
+  it('SERVER_FULL: giữ nguyên server, state và bản lưu; đặt switchError', async () => {
+    await joinedWorld();
+    const before = useWorldStore.getState();
+    const p = useWorldStore.getState().switchServer(TARGET);
+    fake.lastEmit('server:switch').ack?.({
+      ok: false,
+      error: { code: 'SERVER_FULL', message: 'đầy', retryable: false },
+    });
+    await expect(p).resolves.toBe(false);
+    const st = useWorldStore.getState();
+    expect(st.serverId).toBe(before.serverId);
+    expect(st.sessionId).toBe(SESSION);
+    expect(st.status).toBe('joined');
+    expect(st.switching).toBe(false);
+    expect(st.switchError).toMatchObject({ code: 'SERVER_FULL' });
+    expect(JSON.parse(saved.get('tdvh.world') ?? '{}')).toEqual({ serverId: SERVER, sessionId: SESSION });
+  });
+
+  it('chặn gửi trùng: đang chuyển thì lần gọi thứ hai không emit', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().switchServer(TARGET);
+    await expect(useWorldStore.getState().switchServer(TARGET)).resolves.toBe(false);
+    expect(fake.emitted.filter((e) => e.event === 'server:switch')).toHaveLength(1);
+    fake.lastEmit('server:switch').ack?.({ ok: false, error: { code: 'SERVER_FULL', message: 'đầy', retryable: false } });
+    await p;
+  });
+
+  it('chọn đúng máy chủ đang ở thì không emit', async () => {
+    await joinedWorld();
+    expect(await useWorldStore.getState().switchServer(SERVER)).toBe(false);
+    expect(fake.emitted.some((e) => e.event === 'server:switch')).toBe(false);
+  });
+
+  it('server:switch hết giờ, resync báo đã ở server đích: coi là đã chuyển, không hiện lỗi', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().switchServer(TARGET);
+    fake.lastEmit('server:switch').ack?.({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'Hết thời gian chờ', retryable: true } });
+    await tick();
+    fake.lastEmit('world:resync').ack?.({
+      ok: true,
+      data: worldState({ serverId: TARGET, sessionId: SESSION_B, players: [] }),
+    });
+    await expect(p).resolves.toBe(true);
+    const st = useWorldStore.getState();
+    expect(st.serverId).toBe(TARGET);
+    expect(st.sessionId).toBe(SESSION_B);
+    expect(st.switching).toBe(false);
+    expect(st.switchError).toBeNull();
+    expect(JSON.parse(saved.get('tdvh.world') ?? '{}')).toEqual({ serverId: TARGET, sessionId: SESSION_B });
+  });
+
+  it('server:switch hết giờ, resync báo vẫn ở server cũ: giữ nguyên và hiện lỗi gốc', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().switchServer(TARGET);
+    fake.lastEmit('server:switch').ack?.({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'Hết thời gian chờ', retryable: true } });
+    await tick();
+    fake.lastEmit('world:resync').ack?.({ ok: true, data: worldState() });
+    await expect(p).resolves.toBe(false);
+    const st = useWorldStore.getState();
+    expect(st.serverId).toBe(SERVER);
+    expect(st.sessionId).toBe(SESSION);
+    expect(st.status).toBe('joined');
+    expect(st.switching).toBe(false);
+    expect(st.switchError).toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(JSON.parse(saved.get('tdvh.world') ?? '{}')).toEqual({ serverId: SERVER, sessionId: SESSION });
+  });
+
+  it('server:switch hết giờ, resync cũng lỗi: giữ switchError và để reconnect xử lý', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().switchServer(TARGET);
+    fake.lastEmit('server:switch').ack?.({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'Hết thời gian chờ', retryable: true } });
+    await tick();
+    fake.lastEmit('world:resync').ack?.({ ok: false, error: { code: 'INTERNAL_ERROR', message: 'Hết thời gian chờ', retryable: true } });
+    await expect(p).resolves.toBe(false);
+    const st = useWorldStore.getState();
+    expect(st.switching).toBe(false);
+    expect(st.switchError).toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(st.serverId).toBe(SERVER);
+    // Lỗi có thể thử lại: luồng reconnect đặt lịch nối lại (trạng thái reconnecting).
+    expect(st.status).toBe('reconnecting');
+  });
+
+  it('server:population cập nhật online trong danh sách máy chủ', async () => {
+    useServerStore.setState({
+      servers: [
+        { id: SERVER, slug: 'a', name: 'A', online: 1, activeShops: 0, freePlots: 0, load: 'LOW' },
+        { id: TARGET, slug: 'b', name: 'B', online: 2, activeShops: 0, freePlots: 0, load: 'LOW' },
+      ],
+    });
+    await joinedWorld();
+    fake.fire('server:population', { servers: [{ id: TARGET, online: 7, load: 0.5 }] });
+    const list = useServerStore.getState().servers!;
+    expect(list.find((sv) => sv.id === TARGET)?.online).toBe(7);
+    expect(list.find((sv) => sv.id === SERVER)?.online).toBe(1);
+  });
+});

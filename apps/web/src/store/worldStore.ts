@@ -69,6 +69,12 @@ export interface WorldStore extends WorldData {
   // Gửi chat:send. true khi server nhận; lỗi thì đặt chatError và trả false (ô nhập giữ nguyên nội dung).
   sendChat: (text: string, clientMsgId: string) => Promise<boolean>;
   clearChatError: () => void;
+  // Đổi máy chủ qua server:switch (§3.5.3). true khi server chấp nhận và state đã thay sang server đích.
+  // Thất bại thì giữ nguyên server hiện tại, đặt switchError và trả false. Đang chuyển thì trả false ngay (chặn gửi trùng).
+  switching: boolean;
+  switchError: ApiError | null;
+  switchServer: (targetServerId: string) => Promise<boolean>;
+  clearSwitchError: () => void;
 }
 
 const EMPTY_DATA: WorldData = {
@@ -96,6 +102,8 @@ const INITIAL = {
   actionError: null as WorldStore['actionError'],
   lastChat: null as ChatMessage | null,
   chatError: null as WorldStore['chatError'],
+  switching: false,
+  switchError: null as ApiError | null,
 };
 
 const MAX_CHAT = 50;
@@ -148,7 +156,74 @@ export const useWorldStore = create<WorldStore>()((set) => ({
   clearActionError: () => setWorld({ actionError: null }),
   sendChat: (text, clientMsgId) => chatAction(text, clientMsgId),
   clearChatError: () => setWorld({ chatError: null }),
+  switchServer: (targetServerId) => switchAction(targetServerId),
+  clearSwitchError: () => setWorld({ switchError: null }),
 }));
+
+// server:switch trên cùng socket. Thành công thì thay toàn bộ state bằng WorldState của server đích và ghi lại bản lưu.
+async function switchAction(targetServerId: string): Promise<boolean> {
+  const st = useWorldStore.getState();
+  const s = activeSocket;
+  if (!s || !s.connected || st.status !== 'joined' || st.switching || targetServerId === st.serverId) return false;
+  setWorld({ switching: true, switchError: null });
+  const res = await emitAck(s, 'server:switch', { targetServerId }, { timeoutMs: ACTION_TIMEOUT_MS, retries: 0 });
+  if (!isCurrent(s)) return false;
+  if (!res.ok) {
+    // Hết giờ (hoặc lỗi nội bộ có thể thử lại): server có thể đã chuyển, nên hỏi lại trạng thái thật.
+    if (res.error.code === 'INTERNAL_ERROR' && res.error.retryable) {
+      return resolveUnconfirmedSwitch(s, targetServerId, res.error);
+    }
+    setWorld({ switching: false, switchError: switchApiError(res.error) });
+    return false;
+  }
+  const parsed = WorldStateSchema.safeParse(res.data);
+  if (!parsed.success) {
+    setWorld({ switching: false });
+    failWorld('INTERNAL_ERROR', 'Phản hồi không hợp lệ');
+    return false;
+  }
+  commitSwitch(parsed.data);
+  return true;
+}
+
+// Sau server:switch không rõ kết quả: world:resync cho biết server hiện tại.
+// Đích: coi là đã chuyển, không hiện lỗi. Cũ: giữ nguyên và hiện lỗi gốc. Resync cũng lỗi: giữ switchError, luồng reconnect xử lý.
+async function resolveUnconfirmedSwitch(
+  s: TypedSocket,
+  targetServerId: string,
+  err: { code: string; message: string; retryable: boolean },
+): Promise<boolean> {
+  const res = await emitAck(s, 'world:resync', {}, { timeoutMs: ACTION_TIMEOUT_MS, retries: 0 });
+  if (!isCurrent(s)) return false;
+  if (!res.ok) {
+    setWorld({ switching: false, switchError: switchApiError(err) });
+    if (res.error.retryable) scheduleRetry(s);
+    return false;
+  }
+  const parsed = WorldStateSchema.safeParse(res.data);
+  if (!parsed.success) {
+    setWorld({ switching: false });
+    failWorld('INTERNAL_ERROR', 'Phản hồi không hợp lệ');
+    return false;
+  }
+  if (parsed.data.serverId === targetServerId) {
+    commitSwitch(parsed.data);
+    return true;
+  }
+  setWorld({ switching: false, switchError: switchApiError(err) });
+  return false;
+}
+
+// Thay state bằng WorldState của server mới, xóa lỗi chuyển và ghi bản lưu.
+function commitSwitch(ws: WorldState): void {
+  applyWorldState(ws);
+  setWorld({ switching: false, switchError: null });
+  saveResume(ws.serverId, ws.sessionId);
+}
+
+function switchApiError(err: { code: string; message: string }): ApiError {
+  return new ApiError(err.code as ClientErrorCode, err.message, 409);
+}
 
 // chat:send với clientMsgId do người gọi sinh. Không tự thử lại: gửi lại sẽ tạo yêu cầu mới.
 async function chatAction(text: string, clientMsgId: string): Promise<boolean> {
@@ -420,6 +495,15 @@ function bindSocket(s: TypedSocket): void {
     });
   });
   listen(s, 'world:state', (ws) => applyWorldState(ws));
+  // Số online theo máy chủ cho danh sách đổi máy chủ. Chỉ cập nhật online; các số liệu khác giữ từ REST.
+  listen(s, 'server:population', (evt) => {
+    const list = useServerStore.getState().servers;
+    if (!list) return;
+    const online = new Map(evt.servers.map((sv) => [sv.id, sv.online]));
+    useServerStore.setState({
+      servers: list.map((sv) => (online.has(sv.id) ? { ...sv, online: online.get(sv.id)! } : sv)),
+    });
+  });
   listen(s, 'player:joined', (p) => {
     const st = useWorldStore.getState();
     if (!st.self || p.userId === st.self.userId) return;

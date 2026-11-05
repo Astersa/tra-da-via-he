@@ -175,6 +175,9 @@ importers:
       oxlint-tsgolint:
         specifier: 7.0.2005
         version: 7.0.2005
+      tsx:
+        specifier: 4.23.15
+        version: 4.23.15
 
   apps/server:
     dependencies:

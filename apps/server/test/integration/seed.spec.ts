@@ -36,7 +36,7 @@ describe('seed', () => {
 
   it('resets catalog fields to the §3.9 values on re-run', async () => {
     await seed(testPrisma, cfg);
-    await testPrisma.product.update({ where: { id: 'tra-da' }, data: { defaultPrice: 999n } });
+    await testPrisma.product.update({ where: { id: 'tra-da' }, data: { defaultPrice: 120n } });
     await seed(testPrisma, cfg);
     expect((await testPrisma.product.findUnique({ where: { id: 'tra-da' } }))?.defaultPrice).toBe(100n);
   });

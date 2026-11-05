@@ -11,9 +11,13 @@ const svc = (): SessionService => new SessionService(testPrisma, clock);
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Server in status ACTIVE with the schema defaults (softCap 15, hardCap 25).
-async function activeServer() {
+async function activeServer(hardCap?: number) {
   const s = await seedServer();
-  return testPrisma.gameServer.update({ where: { id: s.id }, data: { status: 'ACTIVE' } });
+  return testPrisma.gameServer.update({
+    where: { id: s.id },
+    // softCap must stay <= hardCap (GameServer_caps_valid), so a small hardCap also lowers softCap.
+    data: { status: 'ACTIVE', ...(hardCap === undefined ? {} : { hardCap, softCap: Math.min(15, hardCap) }) },
+  });
 }
 
 async function fillSessions(serverId: string, n: number): Promise<void> {
@@ -59,6 +63,43 @@ describe('join concurrency', () => {
     expect(await testPrisma.serverSession.count({ where: { serverId: server.id, status: 'ACTIVE' } })).toBe(
       server.hardCap,
     );
+  });
+});
+
+describe('hardCap race across users', () => {
+  it('5 different users join the last 1 slot of a hardCap-3 server in parallel: 1 wins, 4 SERVER_FULL, 3 ACTIVE', async () => {
+    const server = await activeServer(3);
+    await fillSessions(server.id, 2);
+    const users = await Promise.all(Array.from({ length: 5 }, () => seedUser()));
+
+    const results = await raceAll(users.map((u) => () => svc().join(u.id, server.id)));
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(4);
+    for (const r of rejected) expect(r.reason).toMatchObject({ code: 'SERVER_FULL' });
+    expect(await testPrisma.serverSession.count({ where: { serverId: server.id, status: 'ACTIVE' } })).toBe(3);
+  });
+
+  it('5 users switching in from other servers to a hardCap-3 server with 1 slot left: 1 wins, 4 SERVER_FULL', async () => {
+    const source = await activeServer();
+    const target = await activeServer(3);
+    await fillSessions(target.id, 2);
+    const users = await Promise.all(Array.from({ length: 5 }, () => seedUser()));
+    const sessions = [];
+    for (const u of users) sessions.push((await svc().join(u.id, source.id)).session);
+
+    const results = await raceAll(
+      users.map((u, i) => () => svc().switchTo(u.id, sessions[i]!.id, target.id)),
+    );
+
+    const fulfilled = results.filter((r) => r.status === 'fulfilled');
+    const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(4);
+    for (const r of rejected) expect(r.reason).toMatchObject({ code: 'SERVER_FULL' });
+    expect(await testPrisma.serverSession.count({ where: { serverId: target.id, status: 'ACTIVE' } })).toBe(3);
   });
 });
 

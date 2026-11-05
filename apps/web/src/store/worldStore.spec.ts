@@ -355,3 +355,49 @@ describe('worldStore: ngồi và đứng', () => {
     expect(fake.emitted.length).toBe(before);
   });
 });
+
+describe('worldStore: chat', () => {
+  const MSG = '00000000-0000-4000-8000-0000000000c1';
+  const CLIENT_MSG = '00000000-0000-4000-8000-0000000000d1';
+
+  it('chat:message đặt lastChat và thêm vào recentChat', async () => {
+    await joinedWorld();
+    fake.fire('chat:message', { id: MSG, userId: OTHER, displayName: 'Minh', text: 'Chào', at: '2026-11-06T00:00:00.000Z' });
+    const st = useWorldStore.getState();
+    expect(st.lastChat?.id).toBe(MSG);
+    expect(st.recentChat).toHaveLength(1);
+  });
+
+  it('nạp lại world không đặt lastChat', async () => {
+    await joinedWorld();
+    fake.fire('world:state', worldState({ recentChat: [{ id: MSG, userId: OTHER, displayName: 'Minh', text: 'cũ', at: '2026-11-06T00:00:00.000Z' }] }));
+    expect(useWorldStore.getState().recentChat).toHaveLength(1);
+    expect(useWorldStore.getState().lastChat).toBeNull();
+  });
+
+  it('sendChat gửi chat:send đúng payload, thành công thì trả true', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().sendChat('Chào', CLIENT_MSG);
+    expect(fake.lastEmit('chat:send').req).toEqual({ text: 'Chào', clientMsgId: CLIENT_MSG });
+    fake.lastEmit('chat:send').ack?.({ ok: true, data: { id: MSG } });
+    await expect(p).resolves.toBe(true);
+    expect(useWorldStore.getState().chatError).toBeNull();
+  });
+
+  it('sendChat lỗi RATE_LIMITED thì đặt chatError và trả false, không thử lại', async () => {
+    await joinedWorld();
+    const p = useWorldStore.getState().sendChat('Chào', CLIENT_MSG);
+    fake.lastEmit('chat:send').ack?.({
+      ok: false,
+      error: { code: 'RATE_LIMITED', message: 'chậm lại', retryable: true },
+    });
+    await expect(p).resolves.toBe(false);
+    expect(useWorldStore.getState().chatError?.code).toBe('RATE_LIMITED');
+    expect(fake.emitted.filter((e) => e.event === 'chat:send')).toHaveLength(1);
+  });
+
+  it('sendChat khi chưa joined thì không emit', async () => {
+    expect(await useWorldStore.getState().sendChat('Chào', CLIENT_MSG)).toBe(false);
+    expect(fake.emitted.some((e) => e.event === 'chat:send')).toBe(false);
+  });
+});

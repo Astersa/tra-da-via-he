@@ -1,0 +1,41 @@
+databases:
+  - name: tdvh-db
+    plan: free
+    region: singapore
+    databaseName: tdvh
+    user: tdvh
+    postgresMajorVersion: "17"
+
+services:
+  - type: web
+    name: tdvh
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: node -v && pnpm -v && NODE_ENV=development pnpm install --frozen-lockfile && pnpm -r build
+    startCommand: cd apps/server && pnpm exec prisma migrate deploy && exec node dist/main.js
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - render.yaml
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      - key: DB_POOL_MAX
+        value: "5"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tdvh-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: METRICS_TOKEN
+        generateValue: true

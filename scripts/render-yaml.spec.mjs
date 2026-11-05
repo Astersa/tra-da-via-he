@@ -17,7 +17,7 @@ function envEntry(key) {
   const parts = webSection.split(/\n\s+- key: /);
   const hit = parts.find((p) => p.startsWith(`${key}\n`));
   assert.ok(hit, `envVars entry ${key} is missing`);
-  return hit;
+  return `${hit}\n`;
 }
 
 test('render.yaml: database is free, Singapore, PostgreSQL 17', () => {
@@ -27,7 +27,7 @@ test('render.yaml: database is free, Singapore, PostgreSQL 17', () => {
 });
 
 test('render.yaml: web service is free, Singapore, node runtime, health path', () => {
-  assert.match(webSection, /\n\s+type: web\n/);
+  assert.match(webSection, /\n\s+(- )?type: web\n/);
   assert.match(webSection, /\n\s+runtime: node\n/);
   assert.match(webSection, /\n\s+plan: free\n/);
   assert.match(webSection, /\n\s+region: singapore\n/);

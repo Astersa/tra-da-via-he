@@ -1,17 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { createGame } from './game/createGame';
+import { AuthGate } from './ui/AuthGate';
+import './ui/ui.css';
 
+// Game (Phaser) chưa được mount ở task này; M1-E5-T4 sẽ mount lại sau khi vào quán.
 export function App() {
-  const hostRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    const game = createGame(host);
-    return () => {
-      game.destroy(true);
-    };
-  }, []);
-
-  return <div ref={hostRef} className="game-root" />;
+  return <AuthGate />;
 }

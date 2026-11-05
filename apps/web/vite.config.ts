@@ -10,6 +10,15 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['src/**/*.spec.ts'],
+    projects: [
+      {
+        extends: true,
+        test: { name: 'node', include: ['src/**/*.spec.ts'], environment: 'node' },
+      },
+      {
+        extends: true,
+        test: { name: 'dom', include: ['src/**/*.spec.tsx'], environment: 'jsdom' },
+      },
+    ],
   },
 });

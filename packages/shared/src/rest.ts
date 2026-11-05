@@ -7,6 +7,7 @@ import {
   OrderStatus,
   PlotKind,
   ShopTxType,
+  UserKind,
   UserRole,
   WalletTxType,
 } from "./enums.js";
@@ -22,8 +23,14 @@ import {
 // Mật khẩu: 8..72 ký tự (đếm theo card M0-E3-T3).
 export const PasswordSchema = z.string().min(8).max(72);
 
-// Email: cắt khoảng trắng, chuẩn hóa lowercase, rồi kiểm tra định dạng.
-export const EmailSchema = z.string().trim().toLowerCase().pipe(z.email());
+// Username: cắt khoảng trắng, lowercase, 3..20 ký tự, chỉ a-z, 0-9, gạch dưới (§3.3).
+export const UsernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3)
+  .max(20)
+  .regex(/^[a-z0-9_]+$/);
 
 // displayName: NFC, 3..20 ký tự, chữ cái Unicode, số, khoảng trắng đơn giữa các từ.
 export const DisplayNameSchema = z
@@ -63,7 +70,8 @@ export function displayNameKey(s: string): string {
 export const UserViewSchema = z
   .object({
     id: UuidSchema,
-    email: z.string(),
+    kind: z.enum(UserKind),
+    username: z.string().nullable(),
     role: z.enum(UserRole),
     mutedUntil: z.string().nullable(),
     createdAt: z.string(),
@@ -210,20 +218,20 @@ const CursorPage = <T extends z.ZodType>(item: T) =>
 const ItemList = <T extends z.ZodType>(item: T) => z.object({ items: z.array(item) }).strict();
 
 // ---- Auth ----
-export const RegisterReqSchema = z
-  .object({
-    email: EmailSchema,
-    password: PasswordSchema,
-    displayName: DisplayNameSchema,
-    avatarId: AvatarIdSchema,
-  })
+export const AuthResSchema = z.object({ accessToken: z.string(), user: UserViewSchema }).strict();
+export const GuestReqSchema = z
+  .object({ displayName: DisplayNameSchema, avatarId: AvatarIdSchema })
   .strict();
-export const RegisterResSchema = z.object({ accessToken: z.string(), user: UserViewSchema }).strict();
+export const GuestResSchema = AuthResSchema;
+export const UpgradeReqSchema = z
+  .object({ username: UsernameSchema, password: PasswordSchema })
+  .strict();
+export const UpgradeResSchema = AuthResSchema;
 // Login chỉ giới hạn trên để chặn payload lớn; mật khẩu sai trả INVALID_CREDENTIALS ở server.
 export const LoginReqSchema = z
-  .object({ email: EmailSchema, password: z.string().min(1).max(72) })
+  .object({ username: UsernameSchema, password: z.string().min(1).max(72) })
   .strict();
-export const LoginResSchema = RegisterResSchema;
+export const LoginResSchema = AuthResSchema;
 export const RefreshResSchema = z.object({ accessToken: z.string() }).strict();
 
 // ---- Me ----
@@ -318,7 +326,8 @@ export const AdminTerminateEmployeeReqSchema = TerminateEmployeeReqSchema;
 export const AdminTerminateEmployeeResSchema = TerminateEmployeeResSchema;
 export const ReconcileResSchema = ReconcileReportSchema;
 
-export type RegisterReq = z.infer<typeof RegisterReqSchema>;
+export type GuestReq = z.infer<typeof GuestReqSchema>;
+export type UpgradeReq = z.infer<typeof UpgradeReqSchema>;
 export type LoginReq = z.infer<typeof LoginReqSchema>;
 export type PatchProfileReq = z.infer<typeof PatchProfileReqSchema>;
 export type PurchasePlotReq = z.infer<typeof PurchasePlotReqSchema>;

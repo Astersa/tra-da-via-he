@@ -3,6 +3,9 @@
 export const UserRole = ["PLAYER", "ADMIN"] as const;
 export type UserRole = (typeof UserRole)[number];
 
+export const UserKind = ["GUEST", "REGISTERED"] as const;
+export type UserKind = (typeof UserKind)[number];
+
 export const GameServerStatus = ["PROVISIONING", "ACTIVE", "DRAINING", "CLOSED"] as const;
 export type GameServerStatus = (typeof GameServerStatus)[number];
 
@@ -28,7 +31,7 @@ export type ShopType = (typeof ShopType)[number];
 export const ShopStatus = ["OPEN", "PAUSED", "CLOSED"] as const;
 export type ShopStatus = (typeof ShopStatus)[number];
 
-export const EmploymentStatus = ["ACTIVE", "RESIGNED", "TERMINATED", "AUTO_RELEASED"] as const;
+export const EmploymentStatus = ["ACTIVE", "RESIGNED", "TERMINATED", "DAILY_RESET"] as const;
 export type EmploymentStatus = (typeof EmploymentStatus)[number];
 
 export const ApplicationStatus = ["PENDING", "ACCEPTED", "REJECTED", "WITHDRAWN", "EXPIRED"] as const;

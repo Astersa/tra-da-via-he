@@ -110,12 +110,12 @@ test('F5 giữ phiên và trở lại đúng máy chủ', async ({ page }: { pag
   expect(before.filter((s) => s.status === 'ACTIVE')).toHaveLength(1);
 
   await page.reload();
-  // Sau F5 màn chọn máy chủ hiện (đã đăng nhập bằng cookie làm mới), chọn lại đúng máy chủ.
-  await expect(page.getByText('Chọn máy chủ', { exact: true })).toBeVisible();
-  await joinServerCard(page, SERVER_NAME);
-  await expect(page.locator('.game-overlay')).toHaveCount(0);
+  // Sau F5 không bấm gì: đã đăng nhập bằng cookie làm mới và có bản lưu máy chủ trong sessionStorage nên vào lại quán ngay.
+  await expect(page.locator('.game-host canvas')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.game-overlay')).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.getByText('Chọn máy chủ', { exact: true })).toHaveCount(0);
 
-  // Vào lại trong grace thì tiếp tục đúng phiên cũ: không tạo phiên mới, phiên cũ vẫn ACTIVE.
+  // Vào lại trong grace thì tiếp tục đúng phiên cũ: không tạo phiên mới, cùng hàng ServerSession.
   const after = await sessionsOf(user.id);
   expect(after).toEqual(before);
   expect(joinsSent(frames)).toBeGreaterThanOrEqual(2);

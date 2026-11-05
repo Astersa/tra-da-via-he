@@ -81,6 +81,14 @@ export class WorldScene extends Phaser.Scene {
 
     this.cameras.main.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels);
     this.cameras.main.setZoom(1.5);
+    // Canvas RESIZE: camera và chữ thông báo theo kích thước mới (vẫn theo nhân vật nhờ startFollow).
+    const onResize = (gameSize: Phaser.Structs.Size) => {
+      if (!this.sys.isActive()) return;
+      this.cameras.main.setSize(gameSize.width, gameSize.height);
+      this.toast?.setX(gameSize.width / 2);
+    };
+    this.scale.on(Phaser.Scale.Events.RESIZE, onResize);
+    this.cameras.main.setSize(this.scale.width, this.scale.height);
 
     // addKeys(..., false): không chặn phím mặc định, để ô chat vẫn gõ được.
     this.keys = this.input.keyboard!.addKeys('W,A,S,D,UP,DOWN,LEFT,RIGHT,E', false) as unknown as KeyMap;
@@ -119,6 +127,7 @@ export class WorldScene extends Phaser.Scene {
       if (msg && msg !== prev.lastChat && this.sys.isActive()) this.bubbles.show(msg.userId, msg.text);
     });
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.scale.off(Phaser.Scale.Events.RESIZE, onResize);
       this.unsubscribeSync?.();
       this.unsubscribePlayers?.();
       this.unsubscribeErrors?.();

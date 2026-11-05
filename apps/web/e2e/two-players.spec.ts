@@ -15,17 +15,17 @@ const SEAT_REACH = 48;
 // Điểm click cách ghế 26 px về phía dưới: nằm trong tầm ngồi (48 px) và không trùng ghế.
 const SEAT_TAP_OFFSET_Y = 26;
 
-// Canvas logic 960x540 (createGame, FIT), camera zoom 1.5 và theo nhân vật (startFollow, không bị kẹp vì spawn ở giữa map).
+// Canvas RESIZE (createGame): kích thước logic = thuộc tính width/height của canvas, camera zoom 1.5 và theo nhân vật.
 // Đổi điểm world sang vị trí trong canvas rồi click; WorldScene đặt đích = tọa độ world của điểm đó.
-const LOGICAL = { w: 960, h: 540 };
 const CAMERA_ZOOM = 1.5;
 async function clickWorld(page: Page, from: { x: number; y: number }, to: { x: number; y: number }): Promise<void> {
   const canvas = page.locator('.game-host canvas');
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
-  const lx = LOGICAL.w / 2 + (to.x - from.x) * CAMERA_ZOOM;
-  const ly = LOGICAL.h / 2 + (to.y - from.y) * CAMERA_ZOOM;
-  await canvas.click({ position: { x: (lx / LOGICAL.w) * box!.width, y: (ly / LOGICAL.h) * box!.height } });
+  const logical = await canvas.evaluate((c: HTMLCanvasElement) => ({ w: c.width, h: c.height }));
+  const lx = logical.w / 2 + (to.x - from.x) * CAMERA_ZOOM;
+  const ly = logical.h / 2 + (to.y - from.y) * CAMERA_ZOOM;
+  await canvas.click({ position: { x: (lx / logical.w) * box!.width, y: (ly / logical.h) * box!.height } });
 }
 
 // Mọi frame socket.io dạng "42[name, data]": event server gửi tới trang (received) hoặc client gửi đi (sent).

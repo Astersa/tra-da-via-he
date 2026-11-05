@@ -128,7 +128,7 @@ Exact version, không dùng `^`. Chọn bản phát hành ít nhất 14 ngày tr
 | socket.io, socket.io-client | 4.8.4 | Có |
 | typescript | 6.0.3 | Có |
 | vitest / vite | 4.1.12 / 8.3.5 | Có |
-| phaser | 4.2.1 | **Không** (dự phòng 3.90.0, xem I8) |
+| phaser | 4.2.1 | Đã chạy ở M0-E1-T5: WebGL, Vite 8, chụp màn hình headless (dự phòng 3.90.0, xem I8) |
 | react, react-dom / @vitejs/plugin-react | 19.3.1 / 6.1.2 | Không |
 | zod / jose / @node-rs/argon2 | 4.6.7 / 6.2.13 / 2.2.2 | Không |
 | zustand / pngjs / @playwright/test | 5.0.16 / 7.0.0 / 1.64.1 | Không |
@@ -153,6 +153,8 @@ Exact version, không dùng `^`. Chọn bản phát hành ít nhất 14 ngày tr
 | `docker run --tmpfs /path` trong Git Bash bị đổi đường dẫn | Dùng compose file, không gõ tay |
 | Lỗi từ query raw là `P2010`; lỗi CHECK qua model API là `P2039`; deadlock **không** phải `P2034` | Luôn đọc `err.meta.driverAdapterError.cause.originalCode` (§3.6.2) |
 | `JSON.stringify` ném lỗi với BigInt | Mọi tiền qua API/socket là chuỗi thập phân (§3.3) |
+| Tên font có số hoặc dấu cách không có nháy, như `Baloo 2`, làm chuỗi font canvas không hợp lệ; chữ Phaser tụt về 10px mà không báo lỗi | Viết `'"Baloo 2", sans-serif'` |
+| `pnpm install` hiện "Agent skills awaiting approval: phaser" | Không chạy `pnpm approve` cho mục này nếu người dùng chưa quyết định |
 
 ### 3.2 Prisma schema
 

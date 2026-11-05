@@ -27,6 +27,10 @@ export class SocketRealtimePublisher implements RealtimePublisher {
     this.target(`server:${serverId}`)?.emit(ev, p);
   }
 
+  toServerVolatile<E extends ServerEvent>(serverId: string, ev: E, p: ServerPayload<E>): void {
+    this.server?.volatile.to(`server:${serverId}`).emit(ev, p);
+  }
+
   toServerExcept<E extends ServerEvent>(serverId: string, userId: string, ev: E, p: ServerPayload<E>): void {
     this.target(`server:${serverId}`)?.except(`user:${userId}`).emit(ev, p);
   }

@@ -1,48 +1,53 @@
 # TRÀ ĐÁ VỈA HÈ — Implementation Plan MVP
 
-**Phiên bản:** 1.0 · **Ngày:** 05/11/2026 · **Đầu vào:** `TRA-DA-VIA-HE-MVP-TECHNICAL-PLAN.md` v1.2 và `assets/tra-da-via-he-concept.png`
-**Trạng thái:** Chờ product owner (PO) xác nhận các Blocker ở §5.1. Chưa có dòng code ứng dụng nào được viết.
+**Phiên bản:** 1.1 · **Ngày:** 05/11/2026 · **Đầu vào:** `TRA-DA-VIA-HE-MVP-TECHNICAL-PLAN.md` v1.2 và `assets/tra-da-via-he-concept.png`
+**Trạng thái:** Product owner (PO) đã chốt các Blocker ngày 05/11/2026 (§5.1), kèm thay đổi về quán DEFAULT (B2) và deploy Render free (§3.10); B5 được thay bằng thiết kế tài khoản khách của người điều phối. Các mục Important ở §5.2 chưa chốt vẫn là đề xuất.
+**Tiến độ:** M0-E1 (T1..T7) và M0-E3 (T1..T3) đã merge vào `main`. Việc tiếp theo: M0-E3-T4, rồi M0-E2. Từ M1 trở đi chưa bắt đầu.
 
 ---
 
 ## 1. Tóm tắt và hiện trạng
 
-**Existing implementation: không có.** Đã liệt kê lại `C:\Users\Admin\Desktop\ICTS` ngày 05/11/2026: chỉ có `TRA-DA-VIA-HE-MVP-DOCS/` chứa brief và ảnh concept. Không có `.git`, `package.json`, Prisma schema hay Docker config. Máy dev: Node 24.21.0, Docker 29.8.0, pnpm 12.6.0.
+**Hiện trạng:** repo có toolchain, Docker Compose dev/test, CI, skeleton `apps/server` và `apps/web`, và contract `packages/shared` (`errors.ts`, `enums.ts`, `events.ts`, `rest.ts`). Chưa có Prisma schema, chưa có remote GitHub. Máy dev: Node 24.21.0, Docker 29.8.0, Windows.
 
-**Plan này gồm:** 7 milestone, 21 epic, 91 task (47 high-risk), tổ chức theo dependency thực. Khác baseline chủ yếu ở chỗ Economy Core đứng trước Order, và luồng hoàn tất đơn chỉ xuất hiện sau Employment (xem §4.2).
+**Plan này gồm:** 7 milestone, 22 epic, 97 task (50 high-risk), tổ chức theo dependency thực. Khác baseline chủ yếu ở chỗ Economy Core đứng trước Order, và luồng hoàn tất đơn chỉ xuất hiện sau Employment (xem §4.2).
 
-**Năm điểm đáng đọc trước:**
+**Sáu điểm đáng đọc trước:**
 
 1. **Tiền hoa hồng là tiền của khách, không phải tiền mới.** Commission, lợi nhuận và chi phí đều tách từ số khách trả, nên thông đồng không in thêm Xu; mỗi đơn còn đốt tiền. Nguồn lạm phát duy nhất là faucet. Rủi ro thật của farm là **rửa faucet qua nhiều tài khoản** (§5.1 B1, B6).
 2. **Baseline M2 không thể chạy trọn:** quán DEFAULT không có chủ, nhân viên chỉ có ở M3 baseline, nên đơn tạo ra không ai xử lý được. Quán còn "tạm ngừng" nếu không có nhân viên online, nên server mới không gọi được món cho tới khi có người vào làm. Đây là vấn đề cold-start (§5.1 B4).
-3. **Quán DEFAULT cần cơ chế thay chủ:** duyệt đơn tự động theo luật, giới hạn chỗ, tự giải phóng nhân viên bỏ việc (§5.1 B2).
+3. **Quán DEFAULT cần cơ chế thay chủ:** duyệt đơn tự động theo luật, tối đa 2 nhân viên, và về 0 nhân viên khi qua ngày mới giờ Việt Nam (§5.1 B2).
 4. **Giá bán cần sàn.** Chủ quán đặt giá thấp hơn chi phí + commission thì treasury âm và đơn không thể hoàn tất. Brief chưa nêu; plan chặn bằng `Product.minPrice` (§3.6.5).
 5. **Khác giả định đầu vào:** Prisma nay **có** partial index, nhưng ở dạng Preview feature `partialIndexes`. Plan vẫn dùng raw SQL trong migration với lý do ở §3.2.3.
+6. **Môi trường deploy là Render free:** 0.1 CPU, service ngủ sau 15 phút, mọi trạng thái trong bộ nhớ mất khi ngủ, và **DB hết hạn sau 30 ngày rồi bị xóa cùng dữ liệu nếu PO không xoay** (§3.10).
 
-**Đã kiểm chứng bằng spike tạm trong scratchpad** (không nằm trong repo, đã xóa container): schema §3.2 chạy `prisma validate` và `migrate` được trên PostgreSQL 17; raw SQL §3.2.3 được áp dụng; `prisma migrate diff` báo không drift và `migrate dev` sau đó sinh migration rỗng; 20 hold song song trên ví 100 Xu chỉ thành công đúng 3 lần; `ON CONFLICT` trên partial index chỉ cho 1 employment; idempotency replay hoạt động; Nest 12 DI và Socket.IO gateway chạy dưới Vitest; `nest build` và `node dist/main.js` chạy được. **Chưa kiểm chứng:** Phaser 4.2.1 với Vite 8, `packages/shared` dùng chung thật, và mọi thứ còn lại trong plan.
+**Đã kiểm chứng bằng spike tạm trong scratchpad** (không nằm trong repo, đã xóa container): schema §3.2 chạy `prisma validate` và `migrate` được trên PostgreSQL 17; raw SQL §3.2.3 được áp dụng; `prisma migrate diff` báo không drift và `migrate dev` sau đó sinh migration rỗng; 20 hold song song trên ví 100 Xu chỉ thành công đúng 3 lần; `ON CONFLICT` trên partial index chỉ cho 1 employment; idempotency replay hoạt động; Nest 12 DI và Socket.IO gateway chạy dưới Vitest; `nest build` và `node dist/main.js` chạy được. **Chưa kiểm chứng:** mọi thứ trên Render (§3.10.1), và mọi thứ còn lại trong plan.
+
+**Spike lại cho bản 1.1 (scratchpad, ngày 05/11/2026):** schema §3.2.2 và CHECK `User_kind_credentials` mới được chạy `prisma validate` và áp dụng cùng raw SQL trên PostgreSQL 17 với Prisma 7.10.1: GUEST có `username` hoặc `passwordHash` bị từ chối, REGISTERED thiếu một trong hai bị từ chối, `username` trùng bị từ chối, nhiều GUEST `username` null được chấp nhận. Luồng reset và nâng cấp chưa có code nên chưa kiểm chứng.
 
 ---
 
 ## 2. Gap analysis
 
-"Existing" của mọi dòng là **không có**, nên bỏ cột để bảng gọn. Task ID trỏ về §4.
+"Existing" của mọi dòng là **không có** tại thời điểm lập bảng, nên bỏ cột để bảng gọn; tiến độ hiện tại ở đầu file. Task ID trỏ về §4.
 
 | Requirement | Missing work | Dependencies | Risks | Proposed solution |
 |---|---|---|---|---|
 | Nền tảng repo, Docker, CI | Toàn bộ | Không | Toolchain mới, version trôi | pnpm workspace, version pin chính xác (M0-E1) |
 | DB, constraint, migration | Toàn bộ | M0-E1 | Raw SQL bị bỏ sót hoặc mất | Một baseline migration; test đọc `pg_catalog` (M0-E2) |
-| Auth, Profile | Toàn bộ | M0 | B5, lộ token | Email + mật khẩu argon2, JWT + refresh xoay vòng (M1-E1) |
+| Auth, Profile | Toàn bộ | M0 | B5, lộ token, tài khoản phụ | Vào bằng tên và nhân vật (tài khoản khách); nâng cấp bằng username + mật khẩu argon2; JWT + refresh xoay vòng (M1-E1) |
 | Server list, join, switch | Toàn bộ | Auth | R7 | Partial unique một session active + advisory lock (M1-E2, E3) |
 | Map 2D, movement, presence | Toàn bộ | Session, asset | R6, map | Map sinh bằng script; server kiểm tra tốc độ và ô đi được (M1-E4, E5) |
-| Chat | Toàn bộ | Session | Spam, B9 | Chat cấp server, rate limit, lọc từ (M1-E4-T5, M6-E2) |
+| Chat | Toàn bộ | Session | Spam, I2 | Chat cấp server, rate limit, lọc từ (M1-E4-T5, M6-E2) |
 | 3 quán DEFAULT/server | Toàn bộ | Schema | Sai số lượng | Provision trong 1 transaction; CHECK + partial unique (M1-E2-T1) |
 | Wallet, Treasury, Ledger | Toàn bộ | M0-E2 | R2, R3, R8 | Một điểm ghi số dư duy nhất `LedgerService` (M2) |
-| Faucet | **Brief chưa định nghĩa** | Ledger, B1 | Không ai có Xu; R8 | Starter grant + top-up khi cạn (M2-E1-T4) |
+| Faucet | **Brief chưa định nghĩa** | Ledger, B1, B5 | Không ai có Xu; R8, R11 | Khách 300 Xu, nâng cấp thêm 1.700 Xu, top-up khi cạn chỉ cho tài khoản đã đăng ký (M2-E1-T4) |
 | Tạo đơn, hold, hủy, hết hạn | Toàn bộ | Economy, Shop | R2, B3 | Hold khi tạo, release khi đóng đơn (M3-E2) |
 | Ứng tuyển, duyệt, nghỉ, sa thải | Toàn bộ | Shop, Session | R4, B2 | Partial unique + `ON CONFLICT` (M4-E1) |
 | Nhận và hoàn tất đơn, commission | Toàn bộ | Employment, Economy | R1, R3 | CAS trạng thái + khóa ledger tất định (M4-E2) |
 | Mở quán tại plot | Toàn bộ | Economy | R5, B8 | Khóa plot + partial unique (M5-E1) |
-| Menu, giá, rút treasury | Toàn bộ | Mở quán | Giá dưới sàn, B10 | `minPrice`/`maxPrice`, phí rút (M5-E2) |
+| Menu, giá, rút treasury | Toàn bộ | Mở quán | Giá dưới sàn, I4 | `minPrice`/`maxPrice`, phí rút (M5-E2) |
+| Deploy Render free | Toàn bộ | M1 | R21, R22, R23 | Một web service phục vụ cả web và API; khởi động tự phục hồi; smoke sớm sau M1 (§3.10, M1-E6) |
 | Vận hành, bảo mật, playtest | Toàn bộ | Tất cả | R6, R8, R9 | M6 |
 
 ---
@@ -61,7 +66,7 @@ ICTS/
 │  │  ├─ prisma/{schema.prisma,migrations/,seed.ts}
 │  │  ├─ prisma.config.ts
 │  │  ├─ src/
-│  │  │  ├─ core/        # prisma, tx, config, errors, logging
+│  │  │  ├─ core/        # prisma, tx, clock, config, errors, logging, rate-limiter, boot-tasks, account-guard
 │  │  │  ├─ auth/  users/
 │  │  │  ├─ economy/     # ledger, wallet, treasury, idempotency, reconcile
 │  │  │  ├─ servers/     # GameServer, provisioning, server list
@@ -78,7 +83,9 @@ ICTS/
 │     ├─ public/assets/           # manifest.json, tileset, sprite
 │     └─ src/{api,socket,store,ui,game,theme}/
 ├─ packages/shared/               # @tdvh/shared — zod schema, event map, ErrorCode, money, map
-├─ scripts/                       # check-money-writes.mjs, gen-map.ts, gen-placeholder-art.ts
+├─ scripts/                       # check-money-writes.mjs, gen-map.ts, gen-placeholder-art.ts, db-backup.mjs, db-restore.mjs
+├─ deploy/RUNBOOK.md              # vận hành Render: xoay DB, script admin, kết quả smoke
+├─ render.yaml                    # Render Blueprint, xem §3.10.3
 ├─ docker-compose.yml             # dev: postgres
 └─ docker-compose.test.yml        # test: postgres tmpfs, port 5433
 ```
@@ -110,6 +117,8 @@ Quy tắc bổ sung:
 - Trong `apps/web`: `src/game/` (Phaser) không import `src/ui/` (React) và ngược lại; hai bên trao đổi qua `src/game/bridge.ts` và store.
 - Service nghiệp vụ không import gateway. Service gọi interface `RealtimePublisher` (định nghĩa trong `core/`, cài đặt trong `realtime/`, inject qua token `REALTIME_PUBLISHER`). Interface `StaffPresence` và `OnlineCounter` cũng theo cách này: `orders`, `servers`, `session` cần biết ai online mà không được phụ thuộc `world`.
 - `assertStaff` nằm trong `shops/`, nên `orders` không cần import `employment`. Ngược lại `employment` gọi `orders` để trả đơn khi nhân viên nghỉ.
+- `assertRegistered` (`core/account-guard.ts`) và `RateLimiter` (`core/rate-limiter.ts`) nằm trong `core/`, vì `economy`, `shops`, `employment` không được import `users`, và `auth` không được import `realtime`.
+- `BootTasks` (`core/boot-tasks.ts`): module đăng ký việc phải xong trước `listen` (§3.10.4), giống cách `SessionEndHooks` nhận hook.
 - **Chỉ `economy/ledger.service.ts` được ghi `Wallet.balance/heldBalance` và `ShopTreasury.balance`.** `scripts/check-money-writes.mjs` fail nếu chuỗi `"Wallet"`, `"ShopTreasury"`, `.wallet.update`, `.shopTreasury.update` hoặc `.walletTransaction.create` xuất hiện ở ngoài `apps/server/src/economy/` (ngoại lệ: `test/`, `prisma/`).
 
 **Khác §7.3 của brief:** gộp `WalletModule` và `TreasuryModule` vào `EconomyModule`; gộp `ProfilesModule` vào `UsersModule`; gộp `ShopPlotModule`, `MenuModule` vào `ShopModule`. Lý do: các phần này chung transaction và chung điểm ghi tiền, tách ra chỉ thêm module vòng. Không có `AI Runtime`, `Social Agent` hay `Shop Bot`.
@@ -139,6 +148,8 @@ Exact version, không dùng `^`. Chọn bản phát hành ít nhất 14 ngày tr
 | helmet / cookie-parser / supertest | 8.3.0 / 1.4.7 / 7.3.1 | Không |
 | @types/react, @types/react-dom / @types/pg / @types/cookie-parser | 19.3.0 / 8.23.1 / 1.4.10 | Không |
 
+§3.10 không thêm dependency: phục vụ static dùng `useStaticAssets` của `@nestjs/platform-express`, không dùng `@nestjs/serve-static`.
+
 **Bẫy toolchain đã gặp thật; executor phải biết:**
 
 | Bẫy | Cách xử lý |
@@ -155,6 +166,8 @@ Exact version, không dùng `^`. Chọn bản phát hành ít nhất 14 ngày tr
 | `JSON.stringify` ném lỗi với BigInt | Mọi tiền qua API/socket là chuỗi thập phân (§3.3) |
 | Tên font có số hoặc dấu cách không có nháy, như `Baloo 2`, làm chuỗi font canvas không hợp lệ; chữ Phaser tụt về 10px mà không báo lỗi | Viết `'"Baloo 2", sans-serif'` |
 | `pnpm install` hiện "Agent skills awaiting approval: phaser" | Không chạy `pnpm approve` cho mục này nếu người dùng chưa quyết định |
+| `NODE_ENV=production` lúc `pnpm install` làm pnpm bỏ devDependencies, nên `nest`, `vite`, `prisma` không có để build | Lệnh build Render đặt `NODE_ENV=development` riêng cho bước install (§3.10.3) |
+| Windows không chuyển tín hiệu: `child.kill('SIGTERM')` giết process ngay, không chạy hook tắt | Kiểm tra tắt gọn bằng `app.close()`; test tín hiệu thật dùng `describe.runIf(process.platform !== 'win32')` theo M1-E6-T3 |
 
 ### 3.2 Prisma schema
 
@@ -182,6 +195,11 @@ datasource db {
 enum UserRole {
   PLAYER
   ADMIN
+}
+
+enum UserKind {
+  GUEST
+  REGISTERED
 }
 
 enum GameServerStatus {
@@ -225,7 +243,7 @@ enum EmploymentStatus {
   ACTIVE
   RESIGNED
   TERMINATED
-  AUTO_RELEASED
+  DAILY_RESET
 }
 
 enum ApplicationStatus {
@@ -268,8 +286,9 @@ enum ShopTxType {
 // ---------- Global ----------
 model User {
   id           String    @id @default(uuid()) @db.Uuid
-  email        String    @unique // luôn lưu lowercase
-  passwordHash String
+  kind         UserKind  @default(GUEST)
+  username     String?   @unique // luôn lưu lowercase; null với GUEST
+  passwordHash String? // null với GUEST
   role         UserRole  @default(PLAYER)
   mutedUntil   DateTime?
   bannedAt     DateTime?
@@ -395,8 +414,8 @@ model GameServer {
   slug       String           @unique
   name       String
   status     GameServerStatus @default(PROVISIONING)
-  softCap    Int              @default(50)
-  hardCap    Int              @default(100)
+  softCap    Int              @default(15)
+  hardCap    Int              @default(25)
   worldMapId String
   createdAt  DateTime         @default(now())
   worldMap   WorldMap         @relation(fields: [worldMapId], references: [id], onDelete: Restrict)
@@ -648,6 +667,10 @@ CREATE INDEX "ShopOrder_open_by_shop"   ON "ShopOrder"("shopId","createdAt") WHE
 CREATE INDEX "ShopOrder_pending_expiry" ON "ShopOrder"("expiresAt")          WHERE "status" = 'PENDING';
 CREATE INDEX "ShopOrder_accept_expiry"  ON "ShopOrder"("acceptExpiresAt")    WHERE "status" = 'ACCEPTED';
 -- CHECK
+ALTER TABLE "User"
+  ADD CONSTRAINT "User_kind_credentials" CHECK (
+    ("kind" = 'GUEST' AND "username" IS NULL AND "passwordHash" IS NULL)
+    OR ("kind" = 'REGISTERED' AND "username" IS NOT NULL AND "passwordHash" IS NOT NULL));
 ALTER TABLE "Wallet"
   ADD CONSTRAINT "Wallet_balance_nonneg" CHECK ("balance" >= 0),
   ADD CONSTRAINT "Wallet_held_valid"     CHECK ("heldBalance" >= 0 AND "heldBalance" <= "balance");
@@ -687,27 +710,28 @@ CREATE TRIGGER "AuditLog_immutable"          BEFORE UPDATE OR DELETE ON "AuditLo
 - `customerId ≠ shop.ownerId` là ràng buộc liên bảng, nên plan lưu `ownerIdSnapshot` để dùng CHECK. Quán không đổi chủ trong MVP nên snapshot không lệch.
 - "Chủ không làm nhân viên ở quán mình" kiểm tra ở service; quyền sở hữu không chuyển nhượng nên không có race.
 
-**Rollback.** Forward-only ở production. Mỗi migration sau baseline kèm `down.sql` viết tay cùng thư mục (Prisma không tự chạy file này); baseline không có down vì lùi về là DB rỗng. Trước `migrate deploy` production luôn chạy `pg_dump` (M6-E4-T3).
+**Rollback.** Forward-only ở production. Mỗi migration sau baseline kèm `down.sql` viết tay cùng thư mục (Prisma không tự chạy file này); baseline không có down vì lùi về là DB rỗng. `migrate deploy` chạy trong start command mỗi lần service khởi động (§3.10.4), nên **trước khi đẩy một migration mới lên nhánh deploy phải chạy `pnpm db:backup`** (M6-E4-T3).
 
 ### 3.3 REST API
 
 Prefix `/api/v1`, JSON. **Tiền là chuỗi thập phân** (`"1500"`, delta có thể `"-20"`), không bao giờ là number. Lỗi: `{ "error": { "code": ErrorCode, "message": string, "details"?: object } }`.
 
-Bearer access token (JWT 15 phút, claim `sub`) trừ khi ghi khác. Refresh token ở cookie `httpOnly; SameSite=Lax; Path=/api/v1/auth`.
+Bearer access token (JWT 15 phút, claim `sub`) trừ khi ghi khác. Refresh token ở cookie `httpOnly; SameSite=Lax; Path=/api/v1/auth`, thêm `Secure` khi `NODE_ENV=production`. Web và API cùng origin (§3.10.2), không bật CORS.
 
 "Scope" nghĩa là user phải có `ServerSession` ACTIVE tại `:serverId` và `shopId` phải thuộc `serverId`; sai thì trả 404 `NOT_FOUND`, không tiết lộ tồn tại. `userId`, giá, số tiền không bao giờ lấy từ client.
 
 | Method + path | Body / query | Response | Quyền |
 |---|---|---|---|
-| POST `/auth/register` | `{email,password,displayName,avatarId}` | `{accessToken,user}` | Công khai, 5/phút/IP |
-| POST `/auth/login` | `{email,password}` | `{accessToken,user}` | Công khai, 10/phút/IP |
+| POST `/auth/guest` | `{displayName,avatarId}` | `{accessToken,user}` + cookie refresh | Công khai, 5/phút/IP và `guestsPerIpPerDay` khách/ngày/IP |
+| POST `/auth/upgrade` | `{username,password}` | `{accessToken,user}` | Auth, chỉ `GUEST`, 5/phút/IP |
+| POST `/auth/login` | `{username,password}` | `{accessToken,user}` + cookie refresh | Công khai, 10/phút/IP |
 | POST `/auth/refresh` | cookie | `{accessToken}` | Cookie |
 | POST `/auth/logout` | cookie | 204 | Cookie |
 | GET `/me` | | `{user,profile}` | Auth |
 | PATCH `/me/profile` | `{displayName?,avatarId?}` | `{profile}` | Auth |
 | GET `/me/wallet` | | `WalletView` + `{dailyTopupFloor: Money}` | Auth |
 | GET `/me/wallet/transactions` | `?cursor&limit≤50` | `{items,nextCursor}` | Auth |
-| POST `/me/wallet/daily-topup` | | `{granted,wallet}` | Auth, idempotent theo ngày |
+| POST `/me/wallet/daily-topup` | | `{granted,wallet}` | Auth, chỉ `REGISTERED`, idempotent theo ngày |
 | GET `/me/employment` | | `{employment\|null}` | Auth |
 | POST `/me/employment/resign` | | `{employment}` | Auth, **không cần scope** |
 | GET `/me/applications` | | `{items}` | Auth |
@@ -718,7 +742,7 @@ Bearer access token (JWT 15 phút, claim `sub`) trừ khi ghi khác. Refresh tok
 | GET `/servers/:serverId/shops` | | `{items:ShopSummary[]}` | Scope |
 | GET `/servers/:serverId/shops/:shopId` | | `ShopDetail` (gồm menu) | Scope |
 | GET `/servers/:serverId/plots` | | `{items:PlotView[]}` | Scope |
-| POST `/servers/:serverId/plots/:plotId/purchase` | `{shopName,clientOpId}` | `{shop,wallet}` | Scope |
+| POST `/servers/:serverId/plots/:plotId/purchase` | `{shopName,clientOpId}` | `{shop,wallet}` | Scope, chỉ `REGISTERED` |
 | PATCH `/servers/:serverId/shops/:shopId` | `{status?:OPEN\|PAUSED,name?,isHiring?}` | `ShopDetail` | Chủ |
 | PUT `/servers/:serverId/shops/:shopId/menu/:productId` | `{price,isActive}` | `MenuItem` | Chủ |
 | GET `/servers/:serverId/shops/:shopId/orders` | `?status&cursor` | `{items,nextCursor}` | Chủ, nhân viên |
@@ -736,8 +760,17 @@ Bearer access token (JWT 15 phút, claim `sub`) trừ khi ghi khác. Refresh tok
 | POST `/admin/reports/:id/resolve` | | 204 | ADMIN |
 | POST `/admin/employees/:employeeId/terminate` | `{reason}` | `{employee}` | ADMIN (quán DEFAULT) |
 | GET `/admin/economy/reconcile` | | `ReconcileReport` | ADMIN |
-| GET `/health` | | `{status,db}` | Công khai |
-| GET `/metrics` | | Text | Chỉ từ mạng nội bộ |
+| GET `/health` | | `{status}` | Công khai; không gọi DB (§3.10.4) |
+| GET `/metrics` | | Text | `Authorization: Bearer <METRICS_TOKEN>`; thiếu env thì 404 (§3.10.7) |
+
+**Quy tắc tài khoản (§5.1 B5):**
+
+- Vào uống trà đá chỉ cần tên và nhân vật: `POST /auth/guest` tạo `User` `kind=GUEST`, `PlayerProfile`, `Wallet`. Đường duy nhất để có tài khoản là `POST /auth/upgrade` từ khách; không có endpoint đăng ký riêng.
+- `username`: 3..20 ký tự, regex `^[a-z0-9_]+$` sau khi trim và lowercase. Mật khẩu: 8..72 khi nâng cấp, 1..72 khi đăng nhập. `displayName`, `avatarId` theo M0-E3-T3.
+- `POST /auth/upgrade` giữ nguyên user id, tên, nhân vật, ví và cookie refresh hiện tại. Lỗi: `USERNAME_TAKEN`, `ALREADY_REGISTERED`, `VALIDATION_FAILED`.
+- `POST /auth/guest` lỗi: `DISPLAY_NAME_TAKEN`, `DISPLAY_NAME_INVALID`, `VALIDATION_FAILED`, `RATE_LIMITED`. Giới hạn theo ngày đếm trong DB, không đếm trong bộ nhớ (§3.6.4), vì service ngủ thì bộ nhớ mất.
+- `kind` luôn đọc từ DB qua `assertRegistered`, không đọc từ JWT hay `socket.data`, nên khách nâng cấp giữa chừng dùng được ngay mà không phải nối lại socket.
+- Không có quên mật khẩu; admin đặt lại qua script (M6-E2-T1, L2). `username` chỉ trả cho chính user đó, không có trong payload công khai.
 
 `ServerCard`: `{id,slug,name,online,activeShops,freePlots,load:"LOW"|"MEDIUM"|"HIGH"}`. `load` theo `online/softCap`: dưới 40% LOW, dưới 75% MEDIUM, còn lại HIGH. Ping đo ở client qua socket ack `world:ping`, không nằm trong API.
 
@@ -748,7 +781,7 @@ Quick Join chọn server ACTIVE **đông nhất** còn dưới `softCap`, không
 Các kiểu `WalletView`, `OrderView`, `ShopSummary`, `ApplicationView` lấy từ §3.4.1. Thời gian là chuỗi ISO. `BigInt` trong DB (số tiền, `id` ledger) luôn trả về dạng chuỗi.
 
 ```ts
-interface UserView { id: Uuid; email: string; role: UserRole; mutedUntil: string | null; createdAt: string } // chỉ trả cho chính user đó
+interface UserView { id: Uuid; kind: UserKind; username: string | null; role: UserRole; mutedUntil: string | null; createdAt: string } // chỉ trả cho chính user đó
 interface ProfileView { userId: Uuid; displayName: string; avatarId: string }
 
 interface EmploymentView { id: Uuid; shopId: Uuid; serverId: Uuid; shopName: string; status: EmploymentStatus; hiredAt: string; endedAt: string | null; endReason: string | null } // chỉ trả cho chính nhân viên
@@ -766,7 +799,7 @@ interface ShopTxView { id: string; type: ShopTxType; amountDelta: Money; balance
 interface AdminServerView { id: Uuid; slug: string; name: string; status: GameServerStatus; softCap: number; hardCap: number; worldMapId: string; createdAt: string }
 interface ChatReportView { id: Uuid; reporterId: Uuid; reportedUserId: Uuid; serverId: Uuid; messageId: Uuid; messageText: string; reason: string; resolvedAt: string | null; createdAt: string }
 interface ReconcileReport { ok: boolean; checkedAt: string; violations: { rule: string; message: string; refType: string | null; refId: string | null }[] } // ok = violations rỗng
-interface HealthRes { status: 'ok' | 'degraded'; db?: 'up' | 'down' } // db thêm khi có Prisma; skeleton M0-E1-T4 chỉ trả status
+interface HealthRes { status: 'ok' | 'degraded'; db?: 'up' | 'down' } // health hiện chỉ trả status (§3.10.4); db để tùy chọn, không dùng
 ```
 
 **Field của các dòng còn lại trong bảng §3.3:** `user: UserView`, `profile: ProfileView`, `employment: EmploymentView` (nullable ở `GET /me/employment`), `employee: EmployeeView`, `application: ApplicationView`, `shop: ShopDetail`, `wallet: WalletView`, `treasury: TreasuryView`, `server: AdminServerView`. `granted`, `fee`, `dailyTopupFloor` là `Money`; `granted` bằng `"0"` khi không được bù. `nextCursor: string | null`.
@@ -777,7 +810,7 @@ interface HealthRes { status: 'ok' | 'degraded'; db?: 'up' | 'down' } // db thê
 
 ### 3.4 Socket.IO event contracts
 
-**Kết nối:** `io(url, { auth: { token: accessToken }, transports: ['websocket'] })`. Middleware kiểm tra JWT và `bannedAt`; sai thì từ chối với `UNAUTHENTICATED`. Kết nối chỉ là "ở sảnh"; chỉ `world:join` mới tạo session.
+**Kết nối:** `io({ auth: { token: accessToken }, transports: ['websocket'] })`, cùng origin với trang web. Middleware kiểm tra JWT và `bannedAt`; sai thì từ chối với `UNAUTHENTICATED`. Kết nối chỉ là "ở sảnh"; chỉ `world:join` mới tạo session.
 
 **Ack thống nhất:** mọi event client → server phải dùng ack.
 
@@ -848,7 +881,9 @@ interface ChatMessage { id: Uuid; userId: Uuid; displayName: string; text: strin
 interface ApplicationView { id: Uuid; shopId: Uuid; userId: Uuid; displayName: string; status: ApplicationStatus; message: string | null; createdAt: string }
 ```
 
-Không có email, số dư người khác hay treasury trong bất kỳ payload broadcast nào. `OrderView.total` chỉ gửi cho khách và staff của quán.
+Không có `username`, số dư người khác hay treasury trong bất kỳ payload broadcast nào. `OrderView.total` chỉ gửi cho khách và staff của quán.
+
+`ShopSummary.isHiring`: quán PLAYER_OWNED lấy từ cột `Shop.isHiring`. Quán DEFAULT **tính**, không đọc cột: `true` khi số `ShopEmployee` ACTIVE có `hiredAt ≥ startOfVnDay(now)` nhỏ hơn `defaultShopEmployeeCap`. Cùng một hàm `computeIsHiring` (M3-E1-T1) dùng cho REST, `WorldState` và `shop:updated`.
 
 #### 3.4.2 Client → Server
 
@@ -868,7 +903,7 @@ Mọi event trừ `world:join` và `world:ping` còn có thể trả `SESSION_ST
 | `player:sit` | `PlayerSitReq` → `{seatId}` | Có session; cách ghế ≤ 48 px | `SEAT_NOT_FOUND`, `SEAT_TAKEN`, `TOO_FAR` | 3 / 1 |
 | `player:stand` | `{}` → `{}` | Có session | — | 3 / 1 |
 | `chat:send` | `ChatSendReq` → `{id}` | Có session, không bị mute | `CHAT_MUTED` | 5 / 0.5 |
-| `shop:apply` | `ShopApplyReq` → `ApplicationView` | Có session; xem §3.7 | `SHOP_NOT_FOUND`, `SHOP_NOT_HIRING`, `SHOP_FULL`, `ALREADY_EMPLOYED`, `ALREADY_APPLIED`, `OWNER_CANNOT_APPLY`, `TOO_MANY_APPLICATIONS` | 3 / 0.05 |
+| `shop:apply` | `ShopApplyReq` → `ApplicationView` | Có session, `REGISTERED`; xem §3.7 | `ACCOUNT_REQUIRED`, `SHOP_NOT_FOUND`, `SHOP_NOT_HIRING`, `SHOP_FULL`, `ALREADY_EMPLOYED`, `ALREADY_APPLIED`, `OWNER_CANNOT_APPLY`, `TOO_MANY_APPLICATIONS` | 3 / 0.05 |
 | `shop:application:respond` | `ApplicationRespondReq` → `ApplicationView` | Chủ quán đó | `APPLICATION_NOT_FOUND`, `APPLICATION_NOT_PENDING`, `APPLICANT_ALREADY_EMPLOYED`, `SHOP_FULL`, `FORBIDDEN` | 5 / 0.5 |
 | `shop:order:create` | `OrderCreateReq` → `OrderView` | Có session; shop cùng server; không phải staff | `SHOP_NOT_FOUND`, `SHOP_NOT_ACCEPTING`, `MENU_ITEM_UNAVAILABLE`, `INSUFFICIENT_FUNDS`, `SELF_PURCHASE_FORBIDDEN`, `TOO_MANY_OPEN_ORDERS`, `IDEMPOTENCY_CONFLICT` | 3 / 0.5 |
 | `shop:order:cancel` (thêm) | `OrderRefReq` → `OrderView` | Khách của đơn | `ORDER_NOT_FOUND`, `ORDER_INVALID_STATE` | 5 / 0.5 |
@@ -876,7 +911,7 @@ Mọi event trừ `world:join` và `world:ping` còn có thể trả `SESSION_ST
 | `shop:order:reject` (thêm) | `OrderRejectReq` → `OrderView` | Staff quán, cùng server | `ORDER_NOT_FOUND`, `ORDER_INVALID_STATE`, `FORBIDDEN` | 5 / 1 |
 | `shop:order:complete` | `OrderRefReq` → `OrderView` | Handler của đơn | `ORDER_NOT_FOUND`, `ORDER_NOT_HANDLER`, `ORDER_INVALID_STATE`, `ORDER_TOO_EARLY`, `ORDER_ACCEPT_EXPIRED`, `FORBIDDEN` | 5 / 2 |
 
-`world:ping` chỉ cần socket đã auth, và không đi qua bước kiểm tra session. `shop:order:complete` gọi lại trên đơn đã COMPLETED bởi chính handler sẽ trả `ok:true` với đơn hiện tại, không chi tiền lần hai. Giới hạn staff giữ tối đa `maxActiveOrdersPerHandler` đơn ACCEPTED cùng lúc để không ôm đơn.
+`world:ping` chỉ cần socket đã auth, và không đi qua bước kiểm tra session. Ngoài đo ping (M1-E5-T2), client còn gửi nó mỗi 5 phút khi tab đang hiển thị để service không ngủ (§3.10.6); event, payload và rate limit đã có sẵn trong `packages/shared/src/events.ts`, không đổi contract. `shop:order:complete` gọi lại trên đơn đã COMPLETED bởi chính handler sẽ trả `ok:true` với đơn hiện tại, không chi tiền lần hai. Giới hạn staff giữ tối đa `maxActiveOrdersPerHandler` đơn ACCEPTED cùng lúc để không ôm đơn.
 
 #### 3.4.3 Server → Client
 
@@ -888,16 +923,16 @@ Mọi event trừ `world:join` và `world:ping` còn có thể trả `SESSION_ST
 | `player:moved` | `PlayerMovedEvt` | `server:{id}` (volatile); bản sửa gửi riêng | Tick 100 ms |
 | `player:interacted` | `{userId, kind, seatId?, state?: 'SIT'\|'STAND'\|'DISCONNECTED'\|'RECONNECTED'}` | `server:{id}` | Emote, ngồi/đứng, mất/hồi kết nối |
 | `chat:message` | `ChatMessage` | `server:{id}` | Sau khi kiểm tra |
-| `shop:updated` | `ShopSummary` | `server:{id}` | Đổi trạng thái, số staff online, quán mới |
+| `shop:updated` | `ShopSummary` | `server:{id}` | Đổi trạng thái, số staff online, quán mới, `isHiring` của quán DEFAULT đổi |
 | `shop:application:updated` | `ApplicationView` | Người nộp + chủ quán | Mọi đổi trạng thái |
 | `shop:order:created` | `OrderView` | `shop-staff:{shopId}` | Đơn mới hoặc đơn trở về PENDING |
 | `shop:order:updated` | `OrderView` | Khách + `shop-staff:{shopId}` | Mọi đổi trạng thái |
 | `wallet:updated` | `WalletView` + `{reason: WalletTxType}` | `user:{id}` | Sau commit |
-| `employment:updated` (thêm) | `{employment: {shopId, serverId, status} \| null}` | `user:{id}` | Nhận việc, nghỉ, bị sa thải |
+| `employment:updated` (thêm) | `{employment: {shopId, serverId, status} \| null}` | `user:{id}` | Nhận việc, nghỉ, bị sa thải, reset qua ngày. Khi kết thúc gửi `status` cuối (`RESIGNED`, `TERMINATED`, `DAILY_RESET`), không gửi `null` |
 | `server:population` | `{servers: {id, online, load}[]}` | `lobby` | Mỗi 5 giây nếu có đổi |
 | `session:replaced` (thêm) | `{reason: 'NEW_TAB' \| 'SWITCHED'}` | Socket cũ, rồi ngắt | Tab mới hoặc phiên mới chiếm chỗ |
 
-**Mã lỗi đầy đủ** (`packages/shared/src/errors.ts`) là hợp của mọi mã trong §3.4.2 cộng thêm: `UNAUTHENTICATED`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS`, `EMAIL_TAKEN`, `DISPLAY_NAME_TAKEN`, `DISPLAY_NAME_INVALID`, `NOT_FOUND`, `PLOT_NOT_FOUND`, `PLOT_TAKEN`, `PLOT_NOT_PURCHASABLE`, `SHOP_LIMIT_REACHED`, `PRICE_OUT_OF_RANGE`, `TREASURY_INSUFFICIENT`, `AMOUNT_INVALID`, `NOT_EMPLOYED`, `TOPUP_NOT_ELIGIBLE`.
+**Mã lỗi đầy đủ** (`packages/shared/src/errors.ts`) là hợp của mọi mã trong §3.4.2 cộng thêm: `UNAUTHENTICATED`, `TOKEN_EXPIRED`, `INVALID_CREDENTIALS`, `USERNAME_TAKEN`, `ALREADY_REGISTERED`, `ACCOUNT_REQUIRED`, `DISPLAY_NAME_TAKEN`, `DISPLAY_NAME_INVALID`, `NOT_FOUND`, `PLOT_NOT_FOUND`, `PLOT_TAKEN`, `PLOT_NOT_PURCHASABLE`, `SHOP_LIMIT_REACHED`, `PRICE_OUT_OF_RANGE`, `TREASURY_INSUFFICIENT`, `AMOUNT_INVALID`, `NOT_EMPLOYED`, `TOPUP_NOT_ELIGIBLE`.
 
 **Client gửi lại.** Với `shop:order:create` và các lệnh tiền REST: sinh `clientOpId` (UUIDv4) **một lần cho mỗi ý định của người dùng**, giữ trong store tới khi có kết quả cuối, và gửi lại đúng key đó khi timeout.
 
@@ -943,7 +978,8 @@ stateDiagram-v2
 | **Reconnect sau grace** | `resumeSessionId` không hợp lệ thì bỏ qua và tạo session mới. Client không báo lỗi |
 | **Nhiều tab** | Mở tab chỉ tạo socket "ở sảnh", không ảnh hưởng gì. Tab nào gọi `world:join` thì chiếm quyền: tab cũ nhận `session:replaced{NEW_TAB}`, bị ngắt, hiển thị nút "Chơi ở tab này" và **không tự kết nối lại** (nếu không hai tab sẽ giành nhau mãi) |
 | **Join cùng server từ tab mới** | Dùng lại session ACTIVE hiện tại, chỉ đổi socket; không phát `player:left`/`joined` |
-| **Process restart** | Khi khởi động: `UPDATE "ServerSession" SET status='ENDED', "endReason"='SERVER_RESTART', "endedAt"=now() WHERE status='ACTIVE'`. Đơn nằm trong DB nên không mất; client kết nối lại và tạo session mới. Handler vẫn hoàn tất được đơn đã nhận nếu quay lại trước `acceptExpiresAt` |
+| **Process restart hoặc Render đánh thức service** | Trước `listen` (§3.10.4): `UPDATE "ServerSession" SET status='ENDED', "endReason"='SERVER_RESTART', "endedAt"=now() WHERE status='ACTIVE'`, không chạy `SessionEndHooks`; sau đó xử lý đơn hết hạn và reset quán DEFAULT. Đơn nằm trong DB nên không mất; client kết nối lại và tạo session mới. Handler vẫn hoàn tất được đơn đã nhận nếu quay lại trước `acceptExpiresAt`. Đơn PENDING còn hạn của khách giữ nguyên trong `myOpenOrders` tới khi hết hạn |
+| **Tắt process (SIGTERM)** | `io.close()`, không đụng DB session (§3.10.4). Client thấy `transport close` và tự nối lại |
 | **Hết hạn access token khi đang chơi** | Socket giữ nguyên. Lần kết nối lại, client refresh token trước. Logout thì publisher ngắt mọi socket của user |
 | **Ban** | Kết thúc session với `KICKED`, ngắt socket |
 
@@ -991,7 +1027,7 @@ stateDiagram-v2
   [*] --> PENDING: tạo đơn, hold tiền khách
   PENDING --> ACCEPTED: staff nhận
   ACCEPTED --> COMPLETED: handler hoàn tất, capture và chia tiền
-  ACCEPTED --> PENDING: handler rời đi, bị sa thải, nghỉ, hoặc quá acceptExpiresAt khi đơn còn hạn
+  ACCEPTED --> PENDING: handler rời đi, bị sa thải, nghỉ, bị reset qua ngày, hoặc quá acceptExpiresAt khi đơn còn hạn
   PENDING --> CANCELLED: khách hủy hoặc khách rời server, release
   PENDING --> REJECTED: staff từ chối, release
   PENDING --> EXPIRED: quá expiresAt, release
@@ -1008,7 +1044,7 @@ stateDiagram-v2
 - Mỗi lần đổi trạng thái: `version + 1` và thêm một dòng `ShopOrderEvent` trong cùng transaction.
 - Khách không hủy được khi đã `ACCEPTED`.
 - **Staff ở server khác:** không có session tại server của quán nên không gọi được accept/complete, đơn của họ về PENDING theo mục 3.5.2.
-- **Sweeper** (`orders/order-sweeper.service.ts`): `setInterval` trong process, mỗi `sweepIntervalSeconds`, chọn tối đa 100 đơn quá hạn với `FOR UPDATE SKIP LOCKED`, xử lý mỗi đơn một transaction. Hàm `sweepOnce(now: Date)` public để test. Không cần queue.
+- **Sweeper** (`orders/order-sweeper.service.ts`): `setInterval` trong process, mỗi `sweepIntervalSeconds`, chọn tối đa 100 đơn quá hạn với `FOR UPDATE SKIP LOCKED`, xử lý mỗi đơn một transaction. Hàm `sweepOnce(now: Date)` public để test. Không cần queue. **Timer không chạy khi service ngủ**, nên `BootTasks` gọi `sweepOnce` lặp lại trước `listen` (§3.10.4).
 
 ### 3.6 Transaction, khóa và idempotency
 
@@ -1030,6 +1066,10 @@ Mọi transaction chỉ lấy khóa nó cần, **theo đúng thứ tự tăng d�
 Dùng `FOR NO KEY UPDATE`, **không dùng `FOR UPDATE`**: khi thêm dòng con có FK, PostgreSQL lấy `FOR KEY SHARE` trên dòng cha, và khóa này xung đột với `FOR UPDATE`, sinh ra chờ không cần thiết và có thể deadlock. Sweeper là ngoại lệ duy nhất dùng `FOR UPDATE SKIP LOCKED` trong truy vấn chọn lô, ngoài transaction xử lý.
 
 Session dùng `pg_advisory_xact_lock(hashtextextended('session:' || $userId, 0))` thay vì khóa dòng `User`, vì các transaction khác liên tục tham chiếu FK đến `User`.
+
+**Reset quán DEFAULT trong transaction `apply`.** `resetStaleDefaultEmployees` gồm hai phần tách biệt để không phá thứ tự khóa: `endStaleInTx` chỉ chạm L4, chạy trước khi đếm chỗ; `releaseEndedInTx` chạm L5, L6 (đơn và ví), chạy **sau** khi đã thêm application và `ShopEmployee` (L4). Nếu gọi `releaseHandlerOrders` trước khi tuyển thì transaction lấy L6 rồi quay lại L4, sai quy tắc trên. Xem §3.6.4.
+
+**Nhiều đơn trong một transaction.** `releaseHandlerOrders` khóa đơn theo `id` tăng dần; mỗi đơn quá hạn gọi `LedgerService.apply` riêng nên các ví không được sắp theo `userId`. Deadlock hiếm ở nhánh này do `withTx` retry; đây là giới hạn đã biết, không tự sửa.
 
 #### 3.6.2 Hàm nền (M0-E2-T3, M2-E1-T1, M2-E1-T2)
 
@@ -1079,7 +1119,8 @@ Lớp phòng thủ cuối: dù mọi kiểm tra trạng thái sai, `@unique` ở
 
 | Bút toán | `idempotencyKey` |
 |---|---|
-| Starter grant | `grant:starter:{userId}` |
+| Starter grant của khách | `grant:starter:{userId}` |
+| Thưởng nâng cấp tài khoản | `grant:upgrade:{userId}` |
 | Daily top-up | `grant:daily:{userId}:{yyyy-mm-dd theo UTC+7}` |
 | Giữ / trả / trừ tiền đơn | `order:{id}:hold` / `order:{id}:release` / `order:{id}:capture` |
 | Commission (ví) | `order:{id}:commission` |
@@ -1095,16 +1136,19 @@ Mỗi dòng là một transaction `withTx`. Phát event luôn nằm **sau** comm
 
 | Thao tác | Các bước theo thứ tự khóa |
 |---|---|
-| **Đăng ký** | Tạo `User`, `PlayerProfile`, `Wallet`; `ledger.apply(STARTER_GRANT)` |
-| **Daily top-up** | Đọc ví; nếu `available ≥ dailyTopupFloor` thì `TOPUP_NOT_ELIGIBLE`; `ledger.apply(DAILY_TOPUP, floor − available)`. Trùng key (P2002) nghĩa là đã nhận hôm nay: trả `{granted: "0"}` |
+| **Tạo khách** | `pg_advisory_xact_lock(hashtextextended('guest-ip:' \|\| $ipHash, 0))` → đếm `AuditLog` `action='AUTH_GUEST_CREATED'`, `metadata->>'ipHash'=$ipHash`, `createdAt ≥ startOfVnDay(now)`; đạt `guestsPerIpPerDay` thì `RATE_LIMITED` với `retryAfterMs` tới 00:00 giờ VN → tạo `User` (`GUEST`), `PlayerProfile`, `Wallet`, `AuditLog` (`createdAt=now`, `ipHash = sha256(ip + ':' + JWT_SECRET)`) → `ledger.apply(STARTER_GRANT, +guestStarterGrant)` |
+| **Nâng cấp khách** | Hash mật khẩu **trước** transaction → `UPDATE "User" SET "kind"='REGISTERED', "username"=$u, "passwordHash"=$h WHERE id=$id AND "kind"='GUEST'`; 0 dòng thì `ALREADY_REGISTERED`; lỗi unique 23505 thì `USERNAME_TAKEN` → `ledger.apply(STARTER_GRANT, +registerBonus)`. Sau commit: `wallet:updated` |
+| **Daily top-up** | `assertRegistered` (GUEST: `ACCOUNT_REQUIRED`) → đọc ví; nếu `available ≥ dailyTopupFloor` thì `TOPUP_NOT_ELIGIBLE`; `ledger.apply(DAILY_TOPUP, floor − available)`. Trùng key (P2002) nghĩa là đã nhận hôm nay: trả `{granted: "0"}` |
 | **Tạo đơn** | L0 idempotency → L1 session → L3 `Shop` FOR SHARE (cùng server, OPEN) → kiểm tra không tự mua và không phải staff, kiểm tra `acceptingOrders` (bộ nhớ) → đọc `ShopMenu` và `Product`, tính tổng → sinh `orderId` ở ứng dụng → L6 `apply(ORDER_HOLD, amount 0, held +total)` → đếm đơn PENDING/ACCEPTED của khách, đạt giới hạn thì ném `TOO_MANY_OPEN_ORDERS` → INSERT đơn, item, event. Khóa dòng ví tuần tự hóa các lần tạo đơn cùng khách nên đếm sau hold mới đúng; đơn mới chưa ai thấy nên không tính là khóa L5 |
 | **Khách hủy** | L1 → L5 đơn → phải là khách + PENDING → cập nhật CANCELLED, event → L6 `apply(ORDER_HOLD_RELEASE, held −total)` |
 | **Nhận đơn** | L1 → L3/L4 kiểm tra staff FOR SHARE → L5: `UPDATE "ShopOrder" SET status='ACCEPTED', "handlerId"=$me, ... WHERE id=$o AND status='PENDING' AND "customerId" <> $me AND "expiresAt" > now() RETURNING *` → 0 dòng thì đọc lại: đã nhận bởi chính mình thì trả `ok`; người khác nhận thì `ORDER_ALREADY_TAKEN`; còn lại `ORDER_INVALID_STATE` |
 | **Từ chối / release / expire** | L5 khóa đơn, kiểm tra trạng thái → cập nhật, event → nếu đóng đơn: L6 release |
 | **Hoàn tất đơn** | Xem dưới |
 | **Duyệt đơn ứng tuyển** | L3 `Shop` FOR NO KEY UPDATE, kiểm tra chủ, đếm nhân viên ACTIVE < cap → L4 khóa application PENDING → `INSERT "ShopEmployee" ... ON CONFLICT ("userId") WHERE "status" = 'ACTIVE' DO NOTHING RETURNING "id"`. 0 dòng thì application thành EXPIRED và trả `APPLICANT_ALREADY_EMPLOYED`. Có dòng thì application thành ACCEPTED, mọi application PENDING khác của user thành EXPIRED, ghi audit |
-| **Nghỉ / sa thải / tự giải phóng** | L4 khóa `ShopEmployee` ACTIVE → cập nhật status → L5 đơn ACCEPTED của user tại quán, theo `id` tăng dần → về PENDING (hoặc EXPIRED kèm release nếu quá hạn) → ghi audit |
-| **Mở quán** | L0 → L1 → L2 khóa plot (cùng server, PURCHASABLE) → đã có shop chưa CLOSED thì `PLOT_TAKEN`; user đã có quán thì `SHOP_LIMIT_REACHED` → INSERT `Shop`, `ShopTreasury`, `ShopMenu` theo catalog → L6 `apply(SHOP_OPEN_FEE, −openFee)`. Bắt lỗi unique 23505 của 2 partial index thì đổi về đúng mã lỗi |
+| **Nộp đơn quán DEFAULT** | L1 → `assertRegistered` → L3 `Shop` FOR NO KEY UPDATE → `endStaleInTx` (L4) → kiểm tra không có employment ACTIVE, không bị TERMINATED tại quán trong 24 giờ → đếm ACTIVE, đạt `defaultShopEmployeeCap` thì `SHOP_FULL` → L4 INSERT application, `hireInTx` với `hiredAt=now` → `releaseEndedInTx` (L5, L6) → gộp event. Lỗi nghiệp vụ làm rollback cả phần reset; tick 60 giây làm lại |
+| **Nghỉ / sa thải** | L4 khóa `ShopEmployee` ACTIVE → `endInTx`: cập nhật status, ghi audit → L5 `releaseHandlerOrders`: đơn ACCEPTED của user tại quán, theo `id` tăng dần → về PENDING (hoặc EXPIRED kèm release nếu quá hạn) |
+| **Reset quán DEFAULT** | Mỗi quán một transaction: L3 `Shop` FOR NO KEY UPDATE, phải `type='DEFAULT'` → `endStaleInTx`: L4 khóa `ShopEmployee` ACTIVE có `hiredAt < startOfVnDay(now)` theo `id` tăng dần, mỗi người `endInTx(DAILY_RESET, actor null)` → `releaseEndedInTx`: L5, L6 `releaseHandlerOrders(..., 'HANDLER_DAILY_RESET', now)` từng người. Sau commit phát event |
+| **Mở quán** | `assertRegistered` → L0 → L1 → L2 khóa plot (cùng server, PURCHASABLE) → đã có shop chưa CLOSED thì `PLOT_TAKEN`; user đã có quán thì `SHOP_LIMIT_REACHED` → INSERT `Shop`, `ShopTreasury`, `ShopMenu` theo catalog → L6 `apply(SHOP_OPEN_FEE, −openFee)`. Bắt lỗi unique 23505 của 2 partial index thì đổi về đúng mã lỗi |
 | **Rút treasury** | L0 → L1 → L3 FOR SHARE kiểm tra chủ + PLAYER_OWNED → tính phí → L6 `apply(TREASURY_WITHDRAWAL, +(amount − fee))` → L7 `apply(WITHDRAWAL, −(amount − fee))`, `apply(WITHDRAWAL_FEE, −fee)` |
 
 **Hoàn tất đơn** (`orders/order-settlement.ts` + `orders/orders.service.ts`), đây là thao tác rủi ro nhất:
@@ -1161,7 +1205,8 @@ Bổ sung: **deadlock chéo** — A mua từ quán B làm và B mua từ quán A
 |---|---|---|
 | Lệnh tạo mới từ client | `clientOpId` + `IdempotencyRecord` | Tạo đơn, mua plot, rút treasury |
 | Lệnh chuyển trạng thái | Trạng thái đích đã đạt và đúng người thì trả OK | Accept, complete, cancel, reject, resign |
-| Lệnh theo chu kỳ | Khóa ledger tất định theo ngày/user | Daily top-up, starter grant |
+| Lệnh theo chu kỳ | Khóa ledger tất định theo ngày/user | Daily top-up, starter grant, thưởng nâng cấp |
+| Tác vụ theo ngày | Điều kiện `hiredAt < startOfVnDay(now)` trên dòng ACTIVE | Reset quán DEFAULT: chạy lại không đổi kết quả |
 | Lưới an toàn | `@unique idempotencyKey` trên ledger | Mọi bút toán |
 | Socket | Client đặt timeout ack 5 giây và gửi lại cùng key | `shop:order:*` |
 
@@ -1178,7 +1223,9 @@ Test đầu cuối của mọi task tiền đều gọi `assertReconciled()` ở
 
 ### 3.7 Authorization matrix
 
-Định nghĩa: **Khách** = có session ở server của quán, không phải staff quán đó. **Nhân viên** = `ShopEmployee` ACTIVE tại quán, session cùng server. **Chủ** = `Shop.ownerId`, session cùng server. **Ở quán DEFAULT không có Chủ**: cột "DEFAULT" cho biết ai thay thế.
+Định nghĩa: **Khách** = người mua: có session ở server của quán, không phải staff quán đó. **Nhân viên** = `ShopEmployee` ACTIVE tại quán, session cùng server. **Chủ** = `Shop.ownerId`, session cùng server. **Ở quán DEFAULT không có Chủ**: cột "DEFAULT" cho biết ai thay thế.
+
+**Đừng lẫn "Khách" trong bảng với "tài khoản khách".** Tài khoản khách là `User.kind='GUEST'`. Tài khoản khách di chuyển, ngồi, chat, gọi đồ uống như mọi người, và nhận `ACCOUNT_REQUIRED` ở 3 thao tác: `shop:apply`, mua plot, `daily-topup`. Tài khoản khách không thể là Nhân viên hay Chủ.
 
 Ký hiệu: Y = được; N = không; `SYS` = backend tự xử lý theo luật; `ADM` = chỉ admin. Mọi hành động đều bị từ chối nếu không có session tại server đó, trừ các dòng "Toàn hệ thống".
 
@@ -1191,20 +1238,21 @@ Ký hiệu: Y = được; N = không; `SYS` = backend tự xử lý theo luật;
 | Nhận / từ chối đơn | N | Y | Y, không commission [B6] | Không có chủ |
 | Hoàn tất đơn mình đã nhận | N | Y, có commission | Y, không commission | Không có chủ |
 | Xử lý đơn do chính mình đặt | N | N (CHECK) | N (CHECK) | — |
-| Nộp đơn ứng tuyển | Y, nếu chưa có employment ACTIVE ở đâu | N `ALREADY_EMPLOYED` | N `OWNER_CANNOT_APPLY` tại quán mình | Nộp được; `SYS` duyệt |
+| Nộp đơn ứng tuyển | Y, nếu `REGISTERED` và chưa có employment ACTIVE ở đâu; GUEST: N `ACCOUNT_REQUIRED` | N `ALREADY_EMPLOYED` | N `OWNER_CANNOT_APPLY` tại quán mình | Nộp được; `SYS` duyệt tới khi đủ 2 người, hết chỗ `SHOP_FULL` |
 | Duyệt / từ chối ứng viên | N | N | Y | `SYS` tự duyệt [B2] |
-| Sa thải nhân viên | N | N | Y | `ADM` + `SYS` tự giải phóng khi vắng lâu [B2] |
+| Sa thải nhân viên | N | N | Y | `ADM` + `SYS` về 0 nhân viên khi qua ngày giờ VN [B2] |
 | Xem danh sách nhân viên | N | Y | Y | — |
 | Sửa giá, bật/tắt món | N | N | Y | `ADM` qua seed; không có API [B2] |
 | Mở / tạm ngừng quán, đổi tên, bật tuyển | N | N | Y | Không đổi được; luôn OPEN |
 | Xem treasury và giao dịch | N | N | Y | `ADM` qua đối soát |
 | Rút treasury | N | N | Y | Không ai rút [B2] |
-| Mua plot | Y | Y [B7] | N nếu đã có quán [B8] | — |
+| Mua plot | Y nếu `REGISTERED`; GUEST: N `ACCOUNT_REQUIRED` | Y [B7] | N nếu đã có quán [B8] | — |
+| **Toàn hệ thống:** nhận daily top-up | Y nếu `REGISTERED`; GUEST: N `ACCOUNT_REQUIRED` | Y | Y | — |
 | **Toàn hệ thống:** nghỉ việc | — | Y, từ bất kỳ đâu | — | Y |
 | **Toàn hệ thống:** xem ví, lịch sử đơn của mình | Y | Y | Y | — |
 | Xem ví người khác | N | N | N | Không ai, trừ `ADM` qua đối soát |
 
-Các dòng có `[Bx]` là đề xuất chờ xác nhận tại §5.1. M5-E2-T6 biến bảng này thành test table-driven.
+Các dòng có `[Bx]` là quyết định đã chốt tại §5.1. M5-E2-T6 biến bảng này thành test table-driven.
 
 ### 3.8 Hướng art
 
@@ -1260,7 +1308,7 @@ M1-E5-T1 có test tương phản: chữ trên nền đạt tối thiểu 4.5:1 v
 
 ### 3.9 Redis và queue
 
-**Không dùng Redis và queue ở MVP.** Toàn bộ chạy một process NestJS + một PostgreSQL. Trạng thái bộ nhớ nằm sau interface để thay sau này.
+**Không dùng Redis và queue ở MVP.** Toàn bộ chạy một process NestJS + một PostgreSQL; web service free của Render là một instance nên kết luận này không đổi (§3.10). Trạng thái bộ nhớ nằm sau interface để thay sau này.
 
 | Chức năng | MVP | Interface | Khi nào đổi sang Redis |
 |---|---|---|---|
@@ -1269,25 +1317,29 @@ M1-E5-T1 có test tương phản: chữ trên nền đạt tối thiểu 4.5:1 v
 | Rate limit | Token bucket trong bộ nhớ | `RateLimiter` | Khi chạy từ 2 process |
 | Mutex theo user | Promise chain | `UserMutex` | Khi chạy từ 2 process; DB vẫn là trọng tài |
 | Sweeper | `setInterval` + `SKIP LOCKED` | Không cần | An toàn đa instance sẵn; không cần đổi |
-| Giới hạn đăng nhập theo IP | Bộ nhớ | `RateLimiter` | Khi chạy từ 2 process |
+| Giới hạn đăng nhập, tạo khách, nâng cấp theo phút/IP | Bộ nhớ | `RateLimiter` | Khi chạy từ 2 process. Mất khi service ngủ, chấp nhận vì cửa sổ chỉ một phút |
+| Giới hạn khách theo ngày/IP | `AuditLog` trong DB + advisory lock | Không cần | An toàn đa instance sẵn; không cần đổi |
+| Reset quán DEFAULT | `setInterval` + hàm idempotent | Không cần | An toàn đa instance sẵn; không cần đổi |
 
 **Điều kiện kích hoạt:** load test M6-E3 cho thấy một process không đạt mục tiêu CCU, hoặc cần nhiều hơn một instance. Lưu ý tick di chuyển và grace timer hiện gắn với process; chuyển đa instance cần sticky session theo server và là một epic riêng, không chỉ thay adapter.
 
-Không queue worker: email không có, sweeper đủ dùng, không có job nặng.
+Không queue worker: không gửi thư, sweeper đủ dùng, không có job nặng. Render free cũng không có background worker (§3.10.1).
 
 **`GameConfig`** (`apps/server/src/core/game-config.ts`, parse bằng zod, ghi đè qua env `GAME_*`). Đây là nơi duy nhất chứa con số; **mọi giá trị là đề xuất để playtest**, xem §5.
 
 | Khóa | Mặc định | Khóa | Mặc định |
 |---|---|---|---|
-| `starterGrant` | 2000 | `orderTtlSeconds` | 600 |
-| `dailyTopupFloor` | 500 | `acceptTimeoutSeconds` | 300 |
-| `commissionBps` | 2000 | `minPrepareSeconds` | 5 |
-| `commissionPairDailyCap` | 20 | `sweepIntervalSeconds` | 15 |
-| `shopOpenFee` | 5000 | `reconnectGraceSeconds` | 30 |
-| `withdrawFeeBps` | 500 | `maxOpenOrdersPerCustomer` | 3 |
-| `purchasablePlots` | 4 | `maxActiveOrdersPerHandler` | 3 |
-| `softCap` / `hardCap` | 50 / 100 | `maxPendingApplications` | 3 |
-| `employeeCapPerShop` | 5 | `defaultShopIdleReleaseDays` | 7 |
+| `guestStarterGrant` | 300 | `orderTtlSeconds` | 600 |
+| `registerBonus` | 1700 | `acceptTimeoutSeconds` | 300 |
+| `dailyTopupFloor` | 500 | `minPrepareSeconds` | 5 |
+| `commissionBps` | 2000 | `sweepIntervalSeconds` | 15 |
+| `commissionPairDailyCap` | 20 | `reconnectGraceSeconds` | 30 |
+| `shopOpenFee` | 5000 | `maxOpenOrdersPerCustomer` | 3 |
+| `withdrawFeeBps` | 500 | `maxActiveOrdersPerHandler` | 3 |
+| `purchasablePlots` | 4 | `maxPendingApplications` | 3 |
+| `softCap` / `hardCap` | 15 / 25 | `guestsPerIpPerDay` | 10 |
+| `employeeCapPerShop` (quán người chơi) | 5 | `defaultShopEmployeeCap` (quán DEFAULT) | 2 |
+| `defaultShopResetTickSeconds` | 60 | | |
 
 **Catalog seed:**
 
@@ -1298,6 +1350,203 @@ Không queue worker: email không có, sweeper đủ dùng, không có job nặn
 | `huong-duong` | Hạt hướng dương | 20 | 30 | 100 | 300 |
 
 Tên 3 quán DEFAULT: `Quán Cô Ba`, `Trà Đá Góc Phố`, `Quán Ông Tư`. Mỗi quán bán cả 3 món ở `defaultPrice`.
+
+### 3.10 Deploy: Render free tier, một repo
+
+PO deploy repo này lên Render free tier; mục này thay phần hạ tầng cũ của I7. Docker Compose chỉ dùng cho dev và test. **Không có** Dockerfile, Compose production hay reverse proxy riêng.
+
+#### 3.10.1 Dữ kiện
+
+Nguồn: docs.render.com, người điều phối đọc ngày 05/11/2026.
+
+| Thành phần | Dữ kiện | Hệ quả cho plan |
+|---|---|---|
+| Web service free | 0.1 CPU, 512 MB; một instance; 750 giờ/workspace/tháng | `softCap`/`hardCap` thấp (§3.10.7). Một service chạy cả tháng vẫn dưới 750 giờ |
+| | Spin down sau 15 phút không có HTTP request hay WebSocket message; khởi động lại khoảng 1 phút; "might restart at any time" | Mọi trạng thái bộ nhớ có thể mất bất cứ lúc nào (§3.10.5); client chịu được cold start (§3.10.6) |
+| | Ephemeral filesystem; không persistent disk, không shell, không one-off job | Không ghi file cục bộ; script admin chạy từ máy local qua external URL (§3.10.8) |
+| | `preDeployCommand` chỉ cho gói trả phí; cron job và background worker không có gói free | Migrate nằm trong start command; timer nằm trong process; không có cron ngoài |
+| | Không gửi được cổng SMTP | Không gửi thư; hợp với quyết định không dùng email (B5) |
+| | WebSocket được hỗ trợ, không giới hạn thời lượng, đóng khi thay instance; SIGTERM cho 30 giây (`maxShutdownDelaySeconds` đến 300); cổng mặc định 10000 | Client tự nối lại; server tắt gọn trong 30 giây; đọc `PORT` từ env |
+| Postgres free | 1 GB; **hết hạn 30 ngày sau khi tạo, ân hạn 14 ngày rồi bị xóa cùng dữ liệu**; không có backup; một DB free mỗi workspace | §3.10.8, I11, R21 |
+| | 256 MB RAM, tối đa khoảng 100 kết nối (bảng trích xuất lẫn lộn, chưa chắc); Blueprint mặc định PostgreSQL 18 | Pool `max: 5`; ghim 17 bằng `postgresMajorVersion` |
+| Blueprint | `plan: free`, `rootDir`, `buildFilter`, `fromDatabase` (`connectionString`), `generateValue: true`, `sync: false` (chỉ hỏi khi tạo Blueprint lần đầu), `healthCheckPath`, `autoDeployTrigger` (`commit`, `checksPass`, `off`). `pnpm` có sẵn trong native runtime Node | §3.10.3 |
+
+**CHƯA xác nhận từ tài liệu đã đọc; phải thử ở lần deploy đầu (M1-E6-T4) và ghi kết quả vào `deploy/RUNBOOK.md`:**
+
+1. Cách ghim Node 24 và pnpm 12.15.0 trong native runtime. Plan thử `NODE_VERSION=24` và `.nvmrc`, và dòng `packageManager`; lệnh build in `node -v`, `pnpm -v` để có bằng chứng.
+2. Docker trên gói free (plan không dùng; chỉ ghi nhận).
+3. Số pipeline minutes của gói free, và lệnh build có chạy hết trong giới hạn không.
+4. Có yêu cầu thẻ không.
+5. Kết nối DB từ ngoài bằng external URL, có cần `?sslmode=require` không.
+6. Version PostgreSQL thực tế sau khi ghim (`SELECT version()`).
+7. Một workspace có tạo được DB free thứ hai khi DB thứ nhất còn tồn tại hoặc đã hết hạn không (§3.10.8).
+8. Render có đặt sẵn `NODE_ENV=production` lúc build không (lệnh build đã tự phòng).
+9. Render có coi Engine.IO heartbeat là WebSocket message giữ service thức không (§3.10.6).
+10. Số hop proxy thực tế, tức `trust proxy = 1` có lấy đúng IP người chơi không (§3.10.2).
+11. Service đang ngủ trả gì cho `fetch` và cho trình duyệt: chờ, trang của Render, hay 502/503 (§3.10.6).
+
+#### 3.10.2 Kiến trúc
+
+- **Một web service duy nhất** chạy Node runtime. Nest phục vụ `apps/web/dist` cùng origin với `/api` và `/socket.io`. Không có CORS, không có cookie chéo domain. Không đặt `rootDir` vì service cần cả `apps/server`, `apps/web`, `packages/shared`.
+- `PORT` từ env, listen `0.0.0.0`.
+- `app.set('trust proxy', 1)`: nếu thiếu, mọi rate limit theo IP và giới hạn khách/IP dùng chung IP của proxy Render. Với giá trị 1, `req.ip` là phần tử **cuối** của `X-Forwarded-For`, nên client không giả mạo được bằng cách thêm phần tử phía trước. Mọi giới hạn theo IP chỉ đọc `req.ip`, không tự đọc header. `socket.handshake.address` là IP của proxy; plan không có giới hạn socket theo IP (M6-E3-T4 ghi "Không áp dụng").
+- Static và SPA fallback theo M1-E6-T2: không chặn `/api`, `/socket.io`; `index.html` gửi `Cache-Control: no-cache`, file khác `public, max-age=3600` (không đặt `immutable` vì `dist/assets/` chứa cả art không có hash từ `public/assets/`).
+- Vì thêm trang web vào Nest, `helmet` đặt CSP tường minh ở M1-E6-T2.
+- Redis: vẫn không cần (§3.9). CI cần repo GitHub (I10): hiện chưa có remote, nên `pnpm verify` ở local là cổng kiểm tra cho tới khi PO tạo repo; Render cũng cần repo này để deploy.
+
+#### 3.10.3 `render.yaml`
+
+Đặt ở root repo, chép nguyên văn (M1-E6-T3):
+
+```yaml
+databases:
+  - name: tdvh-db
+    plan: free
+    region: singapore
+    databaseName: tdvh
+    user: tdvh
+    postgresMajorVersion: "17"
+
+services:
+  - type: web
+    name: tdvh
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: node -v && pnpm -v && NODE_ENV=development pnpm install --frozen-lockfile && pnpm -r build
+    startCommand: cd apps/server && pnpm exec prisma migrate deploy && exec node dist/main.js
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - apps/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - pnpm-workspace.yaml
+        - render.yaml
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      - key: DB_POOL_MAX
+        value: "5"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tdvh-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: METRICS_TOKEN
+        generateValue: true
+```
+
+Lý do từng điểm khác với lệnh thô:
+
+- Build `pnpm install --frozen-lockfile && pnpm -r build`, trong đó `pnpm -r build` đã gồm `prisma generate` (script `build` của server, M0-E2-T1). `NODE_ENV=development` chỉ áp dụng cho bước install, để pnpm cài devDependencies khi Render đặt `NODE_ENV=production`.
+- `exec node`: để `node` thay thế shell và trực tiếp nhận SIGTERM; nếu không, tín hiệu có thể dừng ở shell. Chưa kiểm chứng trên Render.
+- `prisma`, `dotenv` phải còn trong `node_modules` lúc chạy vì start command gọi `prisma migrate deploy`; vì vậy không prune devDependencies.
+- `buildFilter`: commit chỉ sửa `TRA-DA-VIA-HE-MVP-DOCS/`, `docs/`, `deploy/` không build lại, vì thế không làm service khởi động lại.
+- `autoDeployTrigger: checksPass` cần CI trên GitHub chạy được (I10).
+
+#### 3.10.4 Khởi động và tắt
+
+**Thứ tự khởi động** (`startApp` trong `apps/server/src/app.setup.ts`, M1-E6-T1):
+
+```ts
+await app.init();                                     // chưa nhận kết nối
+await app.get(BootTasks).run(app.get(CLOCK).now());   // tuần tự theo `order`; lỗi thì ném, process thoát mã khác 0
+await app.listen(port, '0.0.0.0');
+```
+
+| `order` | Việc | Đăng ký ở |
+|---|---|---|
+| 10 | `SessionService.endAllOnBoot` | M1-E3-T5 |
+| 20 | Gọi `sweepOnce(now)` lặp lại tới khi `scanned < 100`, tối đa 50 vòng | M3-E2-T4 |
+| 30 | `resetStaleDefaultEmployees(now)` | M4-E1-T5 |
+
+Service chỉ ngủ khi không có traffic và không có timer nào chạy trong lúc ngủ, nên đây là nơi bắt kịp mọi việc đã lỡ. **Không dùng cron ngoài.**
+
+**Start command chạy `prisma migrate deploy` mỗi lần khởi động**, vì không có pre-deploy trên gói free. Rủi ro: thêm thời gian vào cold start; migration lỗi làm service không lên được (R25). Khi không có gì để áp dụng thì lệnh là no-op; M1-E6-T3 test hai lần khởi động liên tiếp không lỗi.
+
+**Tắt:** `enableShutdownHooks()` trong `main.ts`. Khi nhận SIGTERM, theo thứ tự: dừng timer (`onModuleDestroy`) → `io.close()` trong `beforeApplicationShutdown` → HTTP server đóng, transaction đang chạy hoàn tất (`withTx` timeout 8 giây, dưới 30 giây) → đóng Prisma.
+
+- **Dùng `io.close()`, không dùng `disconnectSockets()`:** client thấy `transport close` và tự nối lại. `disconnectSockets()` cho lý do `io server disconnect`, client không tự nối lại.
+- **Không cập nhật `ServerSession` lúc tắt.** Khi deploy, instance mới có thể đã chạy trong lúc instance cũ nhận SIGTERM; `UPDATE` hàng loạt sẽ giết session của instance mới. Instance mới cũng chạy `endAllOnBoot` trong khi instance cũ còn phục vụ, nên người chơi có thể gặp `SESSION_STALE` trong thời gian ngắn rồi nối lại: chấp nhận được.
+
+`GET /health` dùng cho `healthCheckPath`, **không gọi DB**, trả `{status:"ok"}`. Lý do: Render gọi đều đặn trên 0.1 CPU, và DB lỗi không sửa được bằng cách khởi động lại web service.
+
+#### 3.10.5 Trạng thái trong bộ nhớ
+
+**Mọi trạng thái in-memory mất khi spin down hoặc restart.**
+
+| Trạng thái | Mất thì sao | Cách xử lý |
+|---|---|---|
+| `ConnectionRegistry`, `UserMutex`, `PresenceStore`, ghế | Không ai online; ghế trống | Client nối lại, `world:join` tạo session mới |
+| Grace timer | Session ACTIVE không bao giờ kết thúc | `endAllOnBoot` |
+| Sweeper | Đơn quá hạn nằm yên, tiền bị giữ | `BootTasks` order 20 |
+| Tick reset quán DEFAULT | Qua đêm vẫn còn nhân viên | `BootTasks` order 30, thêm lời gọi trong `apply` |
+| `StaffPresence` | `onlineStaff=0` | Nạp lại khi nhân viên vào server |
+| Ring buffer chat, `clientMsgId` | `recentChat` rỗng; report tin cũ trả `NOT_FOUND` | Chấp nhận (I2) |
+| `RateLimiter` | Giới hạn theo phút về đầy | Chấp nhận. Giới hạn khách theo ngày nằm trong DB |
+| Reconcile hằng giờ (M6-E1-T2) | Có thể không chạy nếu service sống dưới 1 giờ | Chạy CLI `reconcile` từ local theo runbook |
+
+Không cần xử lý: `Wallet`, đơn, employment, refresh token, idempotency đều ở DB. `Clock`, top-up theo ngày tính khi được gọi.
+
+#### 3.10.6 Cold start và giữ service thức
+
+**Client (M1-E5-T9).** `connectivityStore.status: 'ok' | 'waking'`. Chuyển sang `waking` khi một request `/api/*` gặp lỗi mạng, 502/503/504, hoặc body không phải JSON; hoặc khi socket không nối lại được sau 5 giây. Khi `waking`: hiện màn hình **"Quán đang mở cửa, chờ khoảng 1 phút"**, gọi `GET /api/v1/health` mỗi 5 giây; đạt thì về `ok` và thử lại. Sau 3 phút vẫn không được thì hiện nút "Thử lại".
+
+- **Chỉ 401 mới nghĩa là chưa đăng nhập.** `bootstrap` gặp cold start trên `POST /auth/refresh` không được đưa người chơi về màn tạo khách, nếu không khách sẽ tạo nhân vật thứ hai và mất nhân vật cũ.
+- `POST /auth/guest`, `/auth/login`, `/auth/upgrade` không tự gửi lại khi cold start: màn hình chờ xong thì người chơi bấm lại. Lệnh có `clientOpId` gửi lại đúng key theo §3.4.
+- Socket: `reconnection: true`, `reconnectionAttempts: Infinity`, `reconnectionDelayMax: 10000`, `timeout: 20000`.
+
+**Giới hạn không tránh được:** trang web do chính service phục vụ. Nếu service đang ngủ lúc người chơi mở trang lần đầu, **chưa có JavaScript nào của ta chạy**, nên màn hình trên chưa hiện được; người chơi thấy trình duyệt chờ hoặc trang của Render (mục 11 ở §3.10.1). Màn hình chỉ phục vụ tab đã tải (service ngủ hoặc restart khi tab đang mở). Muốn giải quyết phải tách web sang nơi luôn thức, trái với thiết kế một service, nên giữ nguyên.
+
+**Giữ service thức.** Người chơi ngồi yên 15 phút thì không phát sinh message của game. Client gửi `world:ping` mỗi 5 phút khi `document.visibilityState === 'visible'` và socket đang nối. Tab ẩn thì ngừng gửi. Không có socket thì không có gì giữ service. **Không dùng pinger ngoài.**
+
+**Điểm chưa biết:** Engine.IO có heartbeat riêng, mặc định 25 giây, là message thật trên WebSocket. Nếu Render tính heartbeat là traffic (mục 9 ở §3.10.1) thì: `world:ping` là dư nhưng vô hại; **mọi tab còn mở, kể cả tab ẩn, giữ service thức**, tức ý định "tab ẩn thì để service ngủ" không đạt nếu chỉ ngừng `world:ping`. Về chi phí không sao, một service chạy cả tháng vẫn dưới 750 giờ. Muốn tab ẩn thật sự để service ngủ thì client phải ngắt socket khi tab ẩn lâu, kéo theo hết grace, hủy đơn PENDING và trả đơn đang làm: đó là quyết định sản phẩm, nằm ở I12, **executor không tự làm**.
+
+#### 3.10.7 Tải
+
+0.1 CPU/512 MB thấp hơn nhiều so với giả định cũ.
+
+| Mục | Quyết định | Trạng thái |
+|---|---|---|
+| `softCap`, `hardCap` | 15, 25 (I3) | **Số giả định**, xác nhận bằng load test trên Render (M6-E3-T2) |
+| Pool Prisma | `max: 5` | Env `DB_POOL_MAX`, mặc định 5; test đặt 20 trong `.env.test` |
+| Argon2 | `memoryCost: 19456` (KiB), `timeCost: 2`, `parallelism: 1`, thuật toán mặc định Argon2id; tối đa 2 phép băm cùng lúc trong `PasswordService` | Đo ở M1-E6-T4. Vượt 3 giây một lần đăng nhập trên Render thì dừng và báo; hạ tham số là quyết định bảo mật, không phải việc của executor |
+| Movement | Giữ thiết kế: tick 100 ms, batch, volatile, không ghi DB | **Điểm phải đo** ở M6-E3-T2, cùng `event_loop_lag` |
+| Build | Vite + Phaser + Nest trên build machine của Render | Đo ở M1-E6-T4 |
+
+`/metrics` "chỉ từ mạng nội bộ" không còn nghĩa, vì không có mạng nội bộ nào chạy Prometheus. **Quyết định: giữ, bảo vệ bằng token.** `Authorization: Bearer <METRICS_TOKEN>`, so sánh hằng thời gian; sai trả 401; thiếu env trả 404. Lý do giữ: M6-E3-T2 cần đọc event loop lag trên Render, và không có shell để đọc cách khác.
+
+#### 3.10.8 Sao lưu và xoay DB 30 ngày
+
+**Cảnh báo cho PO: quên xoay thì sau ngày 44 mất toàn bộ dữ liệu, gồm ví, quán, tài khoản. Render free không có backup.**
+
+Không có shell nên **mọi script admin chạy từ máy local qua external URL**: `DATABASE_URL=<external URL> pnpm --filter @tdvh/server <script>`. Gồm `db:seed`, `provision:server`, `admin:promote`, `admin:reset-password`, `reconcile`, `economy-report`. Biến `RENDER_EXTERNAL_DATABASE_URL` đặt trong `.env.render` ở root, đã nằm trong `.gitignore`.
+
+- `pnpm db:backup` (`scripts/db-backup.mjs`): `pg_dump -Fc` qua external URL, ghi `backups/tdvh-<yyyymmdd-hhmm>.dump`. Chạy `pg_dump` trong `postgres:17-alpine` bằng Docker để đúng version và không cần cài client trên Windows. Spawn từ Node với mảng tham số để tránh bẫy đường dẫn của Git Bash.
+- `pnpm db:restore <file> --target=<url>` (`scripts/db-restore.mjs`): `pg_restore --no-owner --no-acl`. Dump đã có raw constraint, trigger và `_prisma_migrations`.
+
+**Runbook xoay DB, làm vào khoảng ngày 21, chậm nhất ngày 28.** Tài liệu ghi chỉ có một DB free mỗi workspace, nên **giả định không tạo được DB mới trước khi xóa DB cũ**; mục 7 ở §3.10.1 kiểm tra điều này ở M6-E4-T4. Vì vậy thứ tự là sao lưu, kiểm tra, rồi mới xóa:
+
+1. Báo người chơi; Suspend web service để không còn ghi mới.
+2. `pnpm db:backup`.
+3. `pnpm db:restore <file> --target=<DB local>`; chạy `reconcile` trên DB local; so số dòng mọi bảng với DB Render. **Có sai lệch thì dừng, không xóa DB cũ.**
+4. Sao file dump sang nơi thứ hai do PO chọn. `backups/` không commit.
+5. Xóa DB cũ trên dashboard. **Đây là điểm không quay lại được.**
+6. Tạo DB mới: free, Singapore, PostgreSQL 17, tên `tdvh-db`.
+7. `pnpm db:restore <file> --target=<external URL mới>`.
+8. Đổi `DATABASE_URL` của web service sang internal URL mới. Render Blueprint có giữ liên kết `fromDatabase` hay không chưa rõ; ghi kết quả vào runbook.
+9. Resume web service; chạy `reconcile` qua external URL; vào game kiểm tra.
+10. Ghi ngày tạo DB mới vào bảng đầu `deploy/RUNBOOK.md`, đặt lịch nhắc cho ngày 21 tiếp theo.
+
+Trong thời gian làm, game ngừng phục vụ. Trước khi có dữ liệu thật thì chỉ cần xóa và tạo lại, không cần restore.
+
+**Phương án thay thế để PO cân nhắc (I11):** DB Render trả phí, không hết hạn và có backup; hoặc Postgres ngoài có gói free không hết hạn. **Phương án thứ hai CHƯA được kiểm tra** về độ trễ tới Singapore, giới hạn kết nối hay điều khoản, và plan không chọn thay PO.
 
 ---
 
@@ -1369,8 +1618,9 @@ file đã sửa, kết quả Verify, và mọi điểm không chắc. Thiếu th
 | M3 Employment + Commission | **M4**: Employment + nhận/hoàn tất đơn | Baseline M2 có đơn nhưng không có ai xử lý; hoàn tất đơn chỉ có nghĩa khi có staff. Commission dùng ledger của M2 |
 | M4 mở quán, rút tiền | **M5**: chỉ còn mở quán, chủ quán vận hành, rút treasury | Phần lõi tiền đã lên M2 |
 | M5 Stabilization | **M6** giữ nguyên, thêm moderation tối thiểu | Cần trước playtest |
+| Không có | **M1-E6**: sẵn sàng deploy và deploy smoke trên Render ngay sau M1 | Kiểm chứng spin down và cold start trước khi xây phần kinh tế; nếu thiết kế sai thì sửa còn rẻ |
 
-Hệ quả: **exit của M3 chưa có vòng lặp đầy đủ**, vì đơn chưa hoàn tất được; vòng lặp đầy đủ đầu tiên xuất hiện ở exit M4. M1 và M2 chạy song song được sau M1-E1.
+Hệ quả: **exit của M3 chưa có vòng lặp đầy đủ**, vì đơn chưa hoàn tất được; vòng lặp đầy đủ đầu tiên xuất hiện ở exit M4. M2 bắt đầu sau M1-E6-T4, không còn chạy song song với M1.
 
 ### 4.3 Dependency graph
 
@@ -1379,6 +1629,7 @@ flowchart TD
   subgraph M0["M0 Foundation"]
     E01["E1 Repo, toolchain"] --> E02["E2 Data foundation"]
     E01 --> E03["E3 Contracts"]
+    E03 --> E02
   end
   subgraph M1["M1 Accounts và World"]
     E11["E1 Auth"]
@@ -1386,6 +1637,7 @@ flowchart TD
     E13["E3 Session, realtime"]
     E14["E4 World server"]
     E15["E5 Client"]
+    E16["E6 Deploy smoke"]
   end
   subgraph M2["M2 Economy Core"]
     E21["E1 Ledger, wallet, faucet"]
@@ -1409,8 +1661,8 @@ flowchart TD
   E02 --> E11
   E03 --> E11
   E02 --> E21
-  E11 --> E12 --> E13 --> E14 --> E15
-  E11 --> E21
+  E11 --> E12 --> E13 --> E14 --> E15 --> E16
+  E16 --> E21
   E13 --> E31
   E21 --> E31
   E31 --> E32
@@ -1425,23 +1677,23 @@ flowchart TD
 
 Đồ thị này ở cấp epic; **cột Deps trong từng bảng là chuẩn**. Ví dụ M1-E4-T1, T3 phải xong trước M1-E3-T4 dù sơ đồ vẽ E3 trước E4.
 
-**Đường găng:** M0-E2 → M2-E1-T1 → M3-E2-T2 → M4-E2-T2 → M5-E1-T1 → M6-E3-T3.
+**Đường găng:** M0-E3-T4 → M0-E2 → M1-E1 → M1-E3 → M1-E5 → M1-E6-T4 → M2-E1-T1 → M3-E2-T2 → M4-E2-T2 → M5-E1-T1 → M6-E3-T3.
 
 **Làn song song:**
 
 | Thời điểm | Chạy song song được |
 |---|---|
-| Sau M0-E1-T3 | M0-E1-T4, T5, T6 |
-| Sau M0-E1 | M0-E2 ‖ M0-E3 |
-| Sau M1-E1 | M1-E2 ‖ M2-E1 (T1, T2) ‖ M1-E4-T1, T2 |
-| Sau M1-E3-T4 | M1-E4-T3, T4, T5 ‖ M1-E5-T1, T2, T3 |
+| Sau M0-E3-T4 | M0-E2-T1; sau M0-E2-T2 thì M0-E2-T3 ‖ T4 |
+| Sau M1-E1 | M1-E2 ‖ M1-E4-T1, T2 |
+| Sau M1-E3-T4 | M1-E4-T4, T5 ‖ M1-E5-T1, T2, T3 |
+| Sau M1-E6-T4 | M2-E1-T1 ‖ T2 |
 | Sau M3-E1-T1 | M3-E1-T2 ‖ M3-E2-T1 |
 | Sau M4-E2 | M4-E3 ‖ M5-E1 |
 | Trong M6 | M6-E1 ‖ M6-E2 ‖ M6-E4 ‖ M6-E5-T2 |
 
 Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `orders/`. Không task nào được chạy tiếp nếu phụ thuộc vào task HR chưa có `APPROVED`.
 
-**Gate sản phẩm:** chưa bắt đầu M0-E2 khi B3 chưa được xác nhận; chưa bắt đầu M1 khi B5 chưa chốt; M2 cần B1; M3 cần B4, B6; M4 cần B2, B7; M5 cần B8. M0-E1 và M0-E3 không phụ thuộc gate.
+**Gate sản phẩm:** B1-B8 đã chốt nên không còn gate nào theo Blocker. **Gate vận hành:** chưa bắt đầu M2 khi chưa có kết quả M1-E6-T4 (cần PO thao tác trên Render).
 
 **Cột Cờ:** `HR` = high-risk, theo quy trình trên. `F` = không hoàn toàn phù hợp với Haiku low, lý do ở §4.11; Executor vẫn giữ nguyên chờ người dùng quyết.
 
@@ -1449,7 +1701,9 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 
 ### 4.4 M0 — Foundation
 
-**Exit:** `pnpm verify` đạt trên repo sạch; schema và raw constraint có mặt; contract dùng chung biên dịch được.
+**Exit:** `pnpm verify` đạt trên repo sạch; schema và raw constraint có mặt; contract dùng chung biên dịch được và khớp schema (`UserKind`, `DAILY_RESET`, username).
+
+**Tiến độ:** M0-E1-T1..T7, M0-E3-T1..T3 đã merge. Card của chúng ghi lại việc đã làm; chỗ nào khác hiện trạng thì M0-E3-T4 và M1-E6-T2 là chuẩn.
 
 | ID | Mô tả | Deps | Size | Cờ | Executor |
 |---|---|---|---|---|---|
@@ -1460,13 +1714,14 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 | M0-E1-T5 | `apps/web` Vite + React + Phaser | T3 | M | | Haiku low |
 | M0-E1-T6 | Docker Compose, env | T2 | S | | Haiku low |
 | M0-E1-T7 | Lint, boundary, money check, CI | T4, T5 | M | | Haiku low |
-| M0-E2-T1 | Prisma schema + generate | E1-T4, E1-T6, B3 | S | HR | Haiku low + Opus review |
+| M0-E2-T1 | Prisma schema + generate | E1-T4, E1-T6, E3-T4 | S | HR | Haiku low + Opus review |
 | M0-E2-T2 | Baseline migration + test constraint | E2-T1 | M | HR | Haiku low + Opus review |
 | M0-E2-T3 | `PrismaService`, `withTx`, test helper | E2-T2 | M | HR | Haiku low + Opus review |
 | M0-E2-T4 | `GameConfig`, catalog seed, giá sàn | E2-T2 | S | HR | Haiku low + Opus review |
 | M0-E3-T1 | ErrorCode, Ack, money schema | E1-T3 | S | | Haiku low |
 | M0-E3-T2 | Socket event schema + event map | E3-T1 | M | | Haiku low |
 | M0-E3-T3 | REST DTO schema | E3-T1 | M | | Haiku low |
+| M0-E3-T4 | Cập nhật contract cho khách và username | E3-T2, E3-T3 | S | | Haiku low |
 
 #### M0-E1-T1 — Khởi tạo git
 - **Đọc:** §4.1.
@@ -1484,7 +1739,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Test:** không có.
 - **Verify:** `pnpm install && pnpm -v`.
 
-#### M0-E1-T3 — `packages/shared` và money helper
+#### M0-E1-T3 — `packages/shared` và money helper [HR]
 - **Đọc:** §3.3 (quy ước tiền), §3.1.
 - **Phạm vi:** `packages/shared/**`.
 - **Contract** (`src/money.ts`):
@@ -1520,7 +1775,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M0-E1-T6 — Docker Compose và env
 - **Đọc:** §3.1.
 - **Phạm vi:** `docker-compose.yml`, `docker-compose.test.yml`, `.env.example`, `apps/server/.env.example`, `apps/server/.env.test`, `package.json` (script `test:db:*`).
-- **Việc:** `docker-compose.yml`: service `postgres`, `postgres:17-alpine`, volume có tên, port `5432`, healthcheck `pg_isready`. `docker-compose.test.yml`: `postgres-test`, port `5433`, `tmpfs: /var/lib/postgresql`, healthcheck. `test:db:up` = `docker compose -f docker-compose.test.yml up -d --wait`. Biến: `DATABASE_URL`, `JWT_SECRET`, `PORT`, `CORS_ORIGIN`. `.env.test` chỉ chứa giá trị test, có commit (ngoại lệ trong `.gitignore`).
+- **Việc:** `docker-compose.yml`: service `postgres`, `postgres:17-alpine`, volume có tên, port `5432`, healthcheck `pg_isready`. `docker-compose.test.yml`: `postgres-test`, port `5433`, `tmpfs: /var/lib/postgresql`, healthcheck. `test:db:up` = `docker compose -f docker-compose.test.yml up -d --wait`. Biến: `DATABASE_URL`, `JWT_SECRET`, `PORT`, `CORS_ORIGIN` (bỏ ở M1-E6-T2). `.env.test` chỉ chứa giá trị test, có commit (ngoại lệ trong `.gitignore`).
 - **AC:** `pnpm test:db:up` đợi đến khi healthy; không có secret thật.
 - **Test:** không có.
 - **Verify:** `pnpm test:db:up && docker compose -f docker-compose.test.yml ps && pnpm test:db:down`.
@@ -1536,8 +1791,8 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M0-E2-T1 — Prisma schema [HR]
 - **Đọc:** §3.2.1, §3.2.2, bẫy toolchain §3.1.
 - **Phạm vi:** `apps/server/prisma/schema.prisma`, `apps/server/prisma.config.ts`, `apps/server/package.json`.
-- **Việc:** chép nguyên văn schema và config. Thêm script `db:generate`; `db:migrate:test` = `node --env-file=.env.test ./node_modules/prisma/build/index.js migrate deploy` (chạy được trên Windows, không cần `cross-env`); `prebuild` và `pretest` gọi `prisma generate`. Pin Prisma 7.10.1 cho cả ba package.
-- **AC:** schema giống hệt §3.2.2. Không thêm model, không đổi tên.
+- **Việc:** chép nguyên văn schema và config. Thêm script `db:generate`; `db:migrate:test` = `node --env-file=.env.test ./node_modules/prisma/build/index.js migrate deploy` (chạy được trên Windows, không cần `cross-env`). Đổi script `build` thành `prisma generate && nest build`, `test` thành `prisma generate && vitest run`; không dùng hook `pre*`, để build trên Render chắc chắn có `prisma generate` (§3.10.3). Pin Prisma 7.10.1 cho cả ba package; `prisma` và `dotenv` là devDependencies.
+- **AC:** schema giống hệt §3.2.2. Không thêm model, không đổi tên. Enum `UserKind`, `EmploymentStatus` khớp `packages/shared/src/enums.ts`.
 - **Test:** review so sánh với plan.
 - **Verify:** `pnpm --filter @tdvh/server exec prisma validate && pnpm --filter @tdvh/server exec prisma generate`.
 
@@ -1547,25 +1802,25 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Việc theo thứ tự:** (1) viết test; (2) tạo migration `--create-only`; `migrate deploy` lên DB test, chạy test và thấy fail vì chưa có raw SQL; (3) nối raw SQL vào `migration.sql`; dựng lại DB test; test phải đạt. `helpers/db.ts`: `resetDb()`, `testPrisma`. Vitest `setupFiles` gọi `process.loadEnvFile(".env.test")`.
 - **Test bắt buộc:**
   - Đọc `pg_indexes`, `pg_constraint`, `pg_trigger`: có đủ **6** partial unique, **3** partial index, **tất cả** CHECK, **4** trigger.
-  - Từ chối: ví âm; `held > balance`; 2 session ACTIVE một user; 2 employment ACTIVE một user; 2 shop sống trên một plot; 2 shop sống một owner; slot DEFAULT trùng; slot 4; DEFAULT có owner; PLAYER_OWNED không owner; đơn `customerId = ownerIdSnapshot`; đơn `handlerId = customerId`; COMPLETED không có settlement; settlement không cộng đủ; `UPDATE`/`DELETE` ledger; đơn với `shopId` thuộc server khác (FK kép).
-  - Chấp nhận: đơn DEFAULT với `ownerIdSnapshot` null; shop CLOSED rồi mở shop mới trên cùng plot; hai employment của một user nếu một đã kết thúc.
+  - Từ chối: GUEST có `username` hoặc `passwordHash`; REGISTERED thiếu `username` hoặc thiếu `passwordHash`; 2 user cùng `username`; ví âm; `held > balance`; 2 session ACTIVE một user; 2 employment ACTIVE một user; 2 shop sống trên một plot; 2 shop sống một owner; slot DEFAULT trùng; slot 4; DEFAULT có owner; PLAYER_OWNED không owner; đơn `customerId = ownerIdSnapshot`; đơn `handlerId = customerId`; COMPLETED không có settlement; settlement không cộng đủ; `UPDATE`/`DELETE` ledger; đơn với `shopId` thuộc server khác (FK kép).
+  - Chấp nhận: nhiều GUEST cùng `username` null; đơn DEFAULT với `ownerIdSnapshot` null; shop CLOSED rồi mở shop mới trên cùng plot; hai employment của một user nếu một đã kết thúc.
   - Không drift: `prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code` thoát 0.
 - **AC:** mọi test đạt. Không sửa `schema.prisma`.
 - **Verify:** `pnpm test:db:up && pnpm --filter @tdvh/server db:migrate:test && pnpm --filter @tdvh/server exec vitest run test/integration/constraints.spec.ts`.
 
 #### M0-E2-T3 — `PrismaService`, `withTx`, helper [HR]
 - **Đọc:** §3.6.1, §3.6.2; bẫy lỗi Prisma §3.1.
-- **Phạm vi:** `apps/server/src/core/{prisma.service.ts,prisma.module.ts,tx.ts,errors.ts,clock.ts}`, `apps/server/test/helpers/{race.ts,db.ts}`, `apps/server/test/concurrency/tx.concurrency.spec.ts`.
-- **Contract:** `withTx`, `pgCode` như §3.6.2. `AppError(code: ErrorCode, message?, details?)`. `Clock { now(): Date }`, token `CLOCK`. `raceAll<T>(fns: (() => Promise<T>)[]): Promise<PromiseSettledResult<T>[]>` thả tất cả cùng lúc qua một promise chặn.
-- **Test (viết trước):** deadlock thật giữa 2 ví theo thứ tự ngược: `withTx` tự retry và cả hai xong; lỗi nghiệp vụ `AppError` không retry; quá lần retry trả `retryable:true`; `pgCode` đúng với 40P01, 23505, 23514.
-- **AC:** pool `max` lấy từ env `DB_POOL_MAX`, mặc định 20. Không có `$transaction` nào khác ngoài `core/tx.ts` trong code ứng dụng; bổ sung kiểm tra này vào `check-money-writes.mjs` là việc của card này.
+- **Phạm vi:** `apps/server/src/core/{prisma.service.ts,prisma.module.ts,tx.ts,errors.ts,clock.ts}`, `apps/server/.env.test`, `apps/server/test/helpers/{race.ts,db.ts}`, `apps/server/test/concurrency/tx.concurrency.spec.ts`, `apps/server/src/core/clock.spec.ts`.
+- **Contract:** `withTx`, `pgCode` như §3.6.2. `AppError(code: ErrorCode, message?, details?)`. `Clock { now(): Date }`, token `CLOCK`. Trong `core/clock.ts`: `startOfVnDay(now: Date): Date` và `vnDayKey(now: Date): string` (`yyyy-mm-dd`), tính theo UTC+7 cố định vì Asia/Ho_Chi_Minh không có giờ mùa hè. `raceAll<T>(fns: (() => Promise<T>)[]): Promise<PromiseSettledResult<T>[]>` thả tất cả cùng lúc qua một promise chặn.
+- **Test (viết trước):** deadlock thật giữa 2 ví theo thứ tự ngược: `withTx` tự retry và cả hai xong; lỗi nghiệp vụ `AppError` không retry; quá lần retry trả `retryable:true`; `pgCode` đúng với 40P01, 23505, 23514; với pool `max: 5`, 20 `withTx` song song đều xong, không có lỗi `maxWait`; `startOfVnDay` và `vnDayKey` ở `2026-11-05T16:59:59Z` và `2026-11-05T17:00:00Z` ra hai ngày khác nhau.
+- **AC:** pool `max` lấy từ env `DB_POOL_MAX`, mặc định 5 (§3.10.7); `.env.test` đặt `DB_POOL_MAX=20` cho test concurrency. Không có `$transaction` nào khác ngoài `core/tx.ts` trong code ứng dụng; bổ sung kiểm tra này vào `check-money-writes.mjs` là việc của card này.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/concurrency/tx.concurrency.spec.ts` (3 lần).
 
 #### M0-E2-T4 — `GameConfig`, catalog seed, giá sàn [HR]
 - **Đọc:** §3.9 (`GameConfig`, catalog), §3.6.5.
-- **Phạm vi:** `apps/server/src/core/game-config.ts`, `apps/server/prisma/seed.ts`, `apps/server/src/economy/product-floors.ts`, test đi kèm.
-- **Contract:** `export function loadGameConfig(env: NodeJS.ProcessEnv): GameConfig`; `export function assertProductFloors(products: Product[], cfg: GameConfig): void`; token `GAME_CONFIG`. Seed upsert `WorldMap{id:"street-01",version:1}` và 3 product; chạy lặp an toàn.
-- **Test:** cấu hình mặc định đạt; `commissionBps=9000` thì `assertProductFloors` ném lỗi (20 / 0.1 = 200 > minPrice); env sai định dạng thì `loadGameConfig` ném lỗi; seed hai lần không nhân bản.
+- **Phạm vi:** `apps/server/src/core/game-config.ts`, `apps/server/prisma/seed.ts`, `apps/server/src/economy/product-floors.ts`, `apps/server/package.json`, test đi kèm.
+- **Contract:** `export function loadGameConfig(env: NodeJS.ProcessEnv): GameConfig`; `export function assertProductFloors(products: Product[], cfg: GameConfig): void`; token `GAME_CONFIG`. Seed upsert `WorldMap{id:"street-01",version:1}` và 3 product; chạy lặp an toàn. Script `db:seed` trong package server, chạy được với `DATABASE_URL` từ env (§3.10.8).
+- **Test:** cấu hình mặc định đạt, gồm `guestStarterGrant=300`, `registerBonus=1700`, `defaultShopEmployeeCap=2`, `softCap=15`, `hardCap=25`; `commissionBps=9000` thì `assertProductFloors` ném lỗi (20 / 0.1 = 200 > minPrice); env sai định dạng thì `loadGameConfig` ném lỗi; seed hai lần không nhân bản.
 - **AC:** không có số economy ở ngoài file này và seed.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run src/core/game-config.spec.ts src/economy/product-floors.spec.ts test/integration/seed.spec.ts`.
 
@@ -1588,22 +1843,46 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M0-E3-T3 — REST DTO
 - **Đọc:** §3.3.
 - **Phạm vi:** `packages/shared/src/rest.ts`, `packages/shared/src/index.ts`, test.
+- **Đã merge; phần email và đăng ký được M0-E3-T4 thay thế.**
 - **Contract:** schema request và response cho mọi dòng §3.3, đặt tên `<Action>Req`, `<Action>Res`. `password` 8..72 ký tự. `displayName` 3..20 ký tự sau NFC, chữ cái Unicode, số, khoảng trắng đơn. Hàm `displayNameKey(s)`: NFC → lowercase → bỏ dấu, `đ→d` → bỏ khoảng trắng. `avatarId ∈ {avatar_01..avatar_04}`.
-- **Test:** `displayNameKey("Trà Đá  ")` = `trada`; hai tên chỉ khác dấu cho cùng key; email được chuẩn hóa lowercase.
+- **Test:** `displayNameKey("Trà Đá  ")` = `trada`; hai tên chỉ khác dấu cho cùng key.
 - **AC:** response tiền luôn là `MoneySchema`.
 - **Verify:** như M0-E3-T1.
+
+#### M0-E3-T4 — Cập nhật contract cho khách và username
+- **Đọc:** §3.3 (bảng, "Quy tắc tài khoản"), §3.3.1 `UserView`, §3.4.3 (mã lỗi); `packages/shared/src/{errors.ts,enums.ts,rest.ts}` hiện tại.
+- **Phạm vi:** `packages/shared/src/{errors.ts,enums.ts,rest.ts}`, `packages/shared/test/{errors.spec.ts,events.spec.ts,rest.spec.ts}`. **Không tạo Prisma schema.**
+- **Việc, chạy trước M0-E2-T1 và M1:**
+  - `errors.ts`: đổi `EMAIL_TAKEN` thành `USERNAME_TAKEN`; thêm `ACCOUNT_REQUIRED`, `ALREADY_REGISTERED`.
+  - `enums.ts`: thêm `export const UserKind = ["GUEST", "REGISTERED"] as const` kèm type; trong `EmploymentStatus` thay `AUTO_RELEASED` bằng `DAILY_RESET`.
+  - `rest.ts`: xóa `EmailSchema`, `RegisterReqSchema`, `RegisterResSchema`, type `RegisterReq`. Thêm:
+    ```ts
+    export const UsernameSchema = z.string().trim().toLowerCase().min(3).max(20).regex(/^[a-z0-9_]+$/);
+    export const AuthResSchema = z.object({ accessToken: z.string(), user: UserViewSchema }).strict();
+    export const GuestReqSchema = z.object({ displayName: DisplayNameSchema, avatarId: AvatarIdSchema }).strict();
+    export const GuestResSchema = AuthResSchema;
+    export const UpgradeReqSchema = z.object({ username: UsernameSchema, password: PasswordSchema }).strict();
+    export const UpgradeResSchema = AuthResSchema;
+    export const LoginReqSchema = z.object({ username: UsernameSchema, password: z.string().min(1).max(72) }).strict();
+    export const LoginResSchema = AuthResSchema;
+    ```
+    `UserViewSchema`: bỏ `email`, thêm `kind: z.enum(UserKind)`, `username: z.string().nullable()`. Export type `GuestReq`, `UpgradeReq`.
+- **Test:** sửa test đang tham chiếu tên cũ. Mảng `ROWS` trong `rest.spec.ts`: bỏ dòng `/auth/register`, thêm `/auth/guest`, `/auth/upgrade`, `ROWS.length` thành **40**; sửa comment số dòng. `events.spec.ts`: `EmploymentStatus` đúng thứ tự mới. Thêm: `UsernameSchema` nhận `" Ab_1 "` thành `ab_1`; từ chối 2 ký tự, 21 ký tự, dấu tiếng Việt, dấu gạch ngang, chữ có khoảng trắng giữa; `LoginReqSchema` nhận mật khẩu 1 ký tự, `UpgradeReqSchema` từ chối mật khẩu 7 và 73 ký tự; `UserViewSchema` từ chối field `email`; `GuestReqSchema` từ chối field lạ. Xóa test `describe("email")`.
+- **AC:** `grep -rniE "email|AUTO_RELEASED|register" packages/shared/src packages/shared/test` rỗng, trừ `registered`/`REGISTERED` của `UserKind`, `ALREADY_REGISTERED`. `dist` không commit.
+- **Verify:** `pnpm --filter @tdvh/shared build && pnpm --filter @tdvh/shared exec vitest run`.
 
 ---
 
 ### 4.5 M1 — Accounts, Server, Multiplayer World
 
-**Exit:** Hai trình duyệt đăng nhập, vào cùng server, thấy nhau di chuyển và chat; server có đúng 3 quán trong DB; F5 và mở tab thứ hai hoạt động đúng; chuyển server không để lại session cũ.
+**Exit:** Hai trình duyệt vào bằng tên và nhân vật, vào cùng server, thấy nhau di chuyển và chat; server có đúng 3 quán trong DB; F5 và mở tab thứ hai hoạt động đúng; chuyển server không để lại session cũ; chạy được trên Render, đã đo spin down và cold start (M1-E6-T4).
 
 | ID | Mô tả | Deps | Size | Cờ | Executor |
 |---|---|---|---|---|---|
-| M1-E1-T1 | Register, login | M0, B5 | M | HR | Haiku low + Opus review |
+| M1-E1-T1 | Tạo khách, đăng nhập | M0, E3-T1 | M | HR | Haiku low + Opus review |
 | M1-E1-T2 | Refresh xoay vòng, logout | E1-T1 | M | HR | Haiku low + Opus review |
 | M1-E1-T3 | `JwtGuard`, `/me`, profile | E1-T1 | S | HR | Haiku low + Opus review |
+| M1-E1-T4 | Nâng cấp khách, `assertRegistered` | E1-T2, E1-T3 | S | HR | Haiku low + Opus review |
 | M1-E2-T1 | Provision server + 3 quán | M0-E2 | M | HR | Haiku low + Opus review |
 | M1-E2-T2 | Server list, quick join | E2-T1, E1-T3 | S | | Haiku low |
 | M1-E3-T1 | `RateLimiter`, `UserMutex`, `ConnectionRegistry` | M0-E3 | S | HR | Haiku low + Opus review |
@@ -1616,37 +1895,60 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 | M1-E4-T3 | `PresenceStore` + movement | E4-T1 | M | | Haiku low |
 | M1-E4-T4 | Ngồi, đứng, emote | E3-T4 | S | | Haiku low |
 | M1-E4-T5 | Chat server | E3-T4 | S | | Haiku low |
-| M1-E5-T1 | API client, auth store, login UI | E1 | M | | Haiku low |
+| M1-E5-T1 | API client, auth store, màn vào | E1 | M | | Haiku low |
 | M1-E5-T2 | Màn chọn server | E5-T1, E2-T2 | S | | Haiku low |
 | M1-E5-T3 | Socket client, reconnect, world store | E5-T1, E3-T5 | M | | Haiku low |
 | M1-E5-T4 | Phaser: map, avatar, input | E5-T3, E4-T2 | M | F | Haiku low |
 | M1-E5-T5 | Người chơi khác, nội suy, ghế | E5-T4, E4-T4 | M | F | Haiku low |
 | M1-E5-T6 | Chat panel, bong bóng | E5-T4, E4-T5 | S | | Haiku low |
-| M1-E5-T7 | E2E Playwright exit M1 | E5-T5, E5-T6 | M | | Haiku low |
+| M1-E5-T7 | E2E Playwright exit M1 | E5-T5, E5-T6, E5-T8, E5-T9 | M | | Haiku low |
+| M1-E5-T8 | Form tạo tài khoản, nút HUD, cảnh báo khách | E5-T1, E1-T4 | S | | Haiku low |
+| M1-E5-T9 | Cold start, `world:ping` giữ thức | E5-T1, E5-T3 | M | | Haiku low |
+| M1-E6-T1 | Chạy sau proxy, `startApp`, tắt gọn | E3-T5 | M | HR | Haiku low + Opus review |
+| M1-E6-T2 | Phục vụ web cùng origin, CSP, bỏ CORS | E6-T1, E5-T7 | M | | Haiku low |
+| M1-E6-T3 | `render.yaml`, test khởi động lặp | E6-T2 | S | HR | Haiku low + Opus review |
+| M1-E6-T4 | Deploy smoke trên Render | E6-T3 | M | F | Haiku low |
 
-#### M1-E1-T1 — Register, login [HR]
-- **Đọc:** §3.3, §3.6.4 dòng Đăng ký; quyết định B5.
-- **Phạm vi:** `apps/server/src/auth/**`, `apps/server/src/users/**`, `app.module.ts`, `test/integration/auth.spec.ts`.
-- **Contract:** `POST /auth/register`, `POST /auth/login` theo §3.3. Hash `@node-rs/argon2`. JWT bằng `jose` HS256, `sub=userId`, `exp=15m`. Register trong một `withTx`: `User`, `PlayerProfile` với `displayNameKey`, `Wallet` số dư 0. Refresh token tạo ở T2; card này trả access token.
-- **Test (viết trước):** thành công; email trùng (kể cả khác hoa thường) `EMAIL_TAKEN`; tên trùng khác dấu `DISPLAY_NAME_TAKEN`; sai mật khẩu và email không tồn tại cùng trả `INVALID_CREDENTIALS`; `passwordHash` không có trong response; 2 đăng ký cùng email song song chỉ 1 thành công; mỗi user đúng một ví; rate limit theo IP.
-- **AC:** register thất bại không để lại dòng nào. Mật khẩu không xuất hiện trong log.
-- **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/auth.spec.ts`.
+#### M1-E1-T1 — Tạo khách, đăng nhập [HR]
+- **Đọc:** §3.3 (dòng `/auth/*`, "Quy tắc tài khoản"), §3.6.4 dòng Tạo khách, §3.10.7 dòng Argon2; quyết định B5.
+- **Phạm vi:** `apps/server/src/auth/**`, `apps/server/src/users/**`, `app.module.ts`, `test/integration/auth.spec.ts`, `test/concurrency/guest-limit.concurrency.spec.ts`.
+- **Contract:** `POST /auth/guest`, `POST /auth/login` theo §3.3. **Không có `POST /auth/register`.**
+  - `auth/password.service.ts`: `PasswordService { hash(plain): Promise<string>; verify(hash, plain): Promise<boolean> }`, `@node-rs/argon2` với tham số §3.10.7, hàng đợi trong process cho tối đa 2 phép băm cùng lúc.
+  - `auth/ip-rate-limit.guard.ts`: decorator `@IpRateLimit(capacity, refillPerSec)`, key `<route>:<req.ip>`, dùng `RateLimiter` trong `core/`. Chỉ đọc `req.ip`.
+  - JWT bằng `jose` HS256, `sub=userId`, `exp=15m`.
+  - Guest trong một `withTx` theo §3.6.4: khóa advisory theo IP → đếm `AuditLog` → `User` (`GUEST`), `PlayerProfile` với `displayNameKey`, `Wallet` số dư 0, `AuditLog`. Lỗi unique trên `displayNameKey` thành `DISPLAY_NAME_TAKEN`. Bút toán 300 Xu thêm ở M2-E1-T4. Refresh token tạo ở T2; card này trả access token.
+- **Test (viết trước):** khách thành công có `kind:"GUEST"`, `username:null`; tên trùng khác dấu `DISPLAY_NAME_TAKEN`; đăng nhập đúng (user REGISTERED tạo bằng factory, không qua API); `username` khác hoa thường vẫn đăng nhập được; sai mật khẩu và `username` không tồn tại cùng trả `INVALID_CREDENTIALS`; `passwordHash` không có trong response; hash bắt đầu bằng `$argon2id$v=19$m=19456,t=2,p=1$`; một lần băm dưới 2 giây trên máy dev; mỗi user đúng một ví; rate limit theo IP; khách thứ 11 cùng IP trong ngày nhận `RATE_LIMITED` có `retryAfterMs`; IP khác không bị ảnh hưởng; qua 00:00 giờ VN thì được tạo lại; **khởi động lại app vẫn giữ số đếm**; 15 lời gọi song song cùng IP chỉ đúng 10 thành công.
+- **AC:** tạo khách thất bại không để lại dòng nào. Mật khẩu không xuất hiện trong log. IP thô không ghi vào DB. `/auth/register` trả 404.
+- **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/auth.spec.ts test/concurrency/guest-limit.concurrency.spec.ts` (3 lần).
 
 #### M1-E1-T2 — Refresh, logout [HR]
 - **Đọc:** §3.3; §3.2.2 model `RefreshToken`.
 - **Phạm vi:** `apps/server/src/auth/**`, `test/integration/auth-refresh.spec.ts`.
-- **Contract:** token ngẫu nhiên 32 byte; lưu sha256; hạn 30 ngày; cookie theo §3.3. Mỗi lần refresh: thu hồi token cũ, tạo token mới, đặt `replacedBy`. **Dùng lại token đã thu hồi thì thu hồi toàn bộ token của user** (phát hiện đánh cắp). Logout gọi `RealtimePublisher.disconnectUser` khi đã có (M1-E3-T2 nối vào).
-- **Test (viết trước):** xoay vòng đúng; dùng lại token cũ làm mất cả chuỗi; token hết hạn bị từ chối; logout làm mất hiệu lực; 2 refresh song song cùng token: tối đa một token mới còn hiệu lực.
+- **Contract:** token ngẫu nhiên 32 byte; lưu sha256; hạn 30 ngày; cookie theo §3.3. `POST /auth/guest` và `POST /auth/login` đặt cookie. Mỗi lần refresh: thu hồi token cũ, tạo token mới, đặt `replacedBy`. **Dùng lại token đã thu hồi thì thu hồi toàn bộ token của user** (phát hiện đánh cắp). Logout gọi `RealtimePublisher.disconnectUser` khi đã có (M1-E3-T2 nối vào).
+- **Test (viết trước):** khách và người đăng nhập đều nhận cookie đúng cờ, có `Secure` khi `NODE_ENV=production`; xoay vòng đúng; dùng lại token cũ làm mất cả chuỗi; token hết hạn bị từ chối; logout làm mất hiệu lực; 2 refresh song song cùng token: tối đa một token mới còn hiệu lực.
 - **AC:** không lưu token thô.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/auth-refresh.spec.ts`.
 
 #### M1-E1-T3 — `JwtGuard`, `/me`, profile [HR]
 - **Đọc:** §3.3.
 - **Phạm vi:** `apps/server/src/auth/jwt.guard.ts`, `apps/server/src/users/**`, test.
-- **Contract:** `JwtGuard` đặt `req.user = { id, role }`; kiểm tra `bannedAt` từ DB. `@CurrentUser()`. `RolesGuard` + `@Roles('ADMIN')`. `GET /me`, `PATCH /me/profile`.
-- **Test:** thiếu token, token sai, token hết hạn: 401; user bị ban: 401; đổi tên trùng: `DISPLAY_NAME_TAKEN`; response không có email của người khác; `PLAYER` gọi route `@Roles('ADMIN')` nhận 403.
-- **AC:** guard không tin claim nào ngoài `sub`; role đọc từ DB.
+- **Contract:** `JwtGuard` đặt `req.user = { id, role, kind }`; kiểm tra `bannedAt` từ DB. `@CurrentUser()`. `RolesGuard` + `@Roles('ADMIN')`. `GET /me`, `PATCH /me/profile`.
+- **Test:** thiếu token, token sai, token hết hạn: 401; user bị ban: 401; đổi tên trùng: `DISPLAY_NAME_TAKEN`; khách đổi được tên và nhân vật; `GET /me` của khách có `username:null`; response không có `passwordHash`; `PLAYER` gọi route `@Roles('ADMIN')` nhận 403.
+- **AC:** guard không tin claim nào ngoài `sub`; role và `kind` đọc từ DB.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/me.spec.ts`.
+
+#### M1-E1-T4 — Nâng cấp khách, `assertRegistered` [HR]
+- **Đọc:** §3.3 "Quy tắc tài khoản", §3.6.4 dòng Nâng cấp khách, §3.7 (đoạn tài khoản khách).
+- **Phạm vi:** `apps/server/src/auth/**`, `apps/server/src/core/account-guard.ts`, `test/integration/auth-upgrade.spec.ts`, `test/concurrency/auth-upgrade.concurrency.spec.ts`.
+- **Contract:** `POST /auth/upgrade`, `JwtGuard` + `@IpRateLimit(5, 5/60)`. Băm mật khẩu ngoài transaction. `UPDATE ... WHERE "kind"='GUEST'` như §3.6.4. Trả access token mới, giữ cookie.
+  ```ts
+  // core/account-guard.ts
+  assertRegistered(db: PrismaClient | Tx, userId: string): Promise<void>; // đọc User.kind; GUEST thì ném AppError(ACCOUNT_REQUIRED)
+  ```
+  Thưởng 1.700 Xu thêm ở M2-E1-T4.
+- **Test (viết trước):** nâng cấp giữ nguyên `id`, tên, nhân vật, ví; `kind:"REGISTERED"`; `username` lưu lowercase; sau đó đăng nhập được bằng `username` và mật khẩu; **2 upgrade song song cùng username từ 2 user: đúng 1 OK, 1 `USERNAME_TAKEN`**; **upgrade lần 2 cùng user: `ALREADY_REGISTERED`**; 2 upgrade song song cùng user khác username: đúng 1 OK, 1 `ALREADY_REGISTERED`; `username` trùng khác hoa thường: `USERNAME_TAKEN`; rate limit 5/phút/IP; thiếu token 401; `assertRegistered` ném đúng mã với GUEST, không ném với REGISTERED.
+- **AC:** CHECK `User_kind_credentials` không bao giờ bị vi phạm. Lỗi không để lại `username` hay `passwordHash`.
+- **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/auth-upgrade.spec.ts test/concurrency/auth-upgrade.concurrency.spec.ts` (3 lần).
 
 #### M1-E2-T1 — Provision server [HR]
 - **Đọc:** §3.5.1, §3.9 (catalog, tên quán), §3.8 (slot map), §3.2.3 (giới hạn "đúng 3").
@@ -1666,7 +1968,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 
 #### M1-E3-T1 — Rate limiter, mutex, registry [HR]
 - **Đọc:** §3.4, §3.9.
-- **Phạm vi:** `apps/server/src/realtime/{rate-limiter.ts,user-mutex.ts,connection-registry.ts}`, spec đi kèm.
+- **Phạm vi:** `apps/server/src/core/rate-limiter.ts`, `apps/server/src/realtime/{user-mutex.ts,connection-registry.ts}`, spec đi kèm. `RateLimiter` ở `core/` vì `auth` cũng dùng và không được import `realtime`.
 - **Contract:**
   ```ts
   interface RateLimiter { take(key: string, cfg: {capacity: number; refillPerSec: number}, nowMs: number): { ok: true } | { ok: false; retryAfterMs: number } }
@@ -1675,7 +1977,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
   ```
 - **Test (viết trước):** nạp token theo thời gian giả; cạn thì có `retryAfterMs`; 100 lời gọi mutex cùng user chạy tuần tự; khác user chạy song song; `fn` ném lỗi thì lần sau vẫn chạy; registry không để lại entry khi user đi; `unbind` bằng socket cũ không xóa bind mới.
 - **AC:** không rò bộ nhớ: map rỗng sau test.
-- **Verify:** `pnpm --filter @tdvh/server exec vitest run src/realtime`.
+- **Verify:** `pnpm --filter @tdvh/server exec vitest run src/realtime src/core/rate-limiter.spec.ts`.
 
 #### M1-E3-T2 — Socket auth, pipeline, publisher [HR]
 - **Đọc:** §3.4 mở đầu, §3.1 (`RealtimePublisher`).
@@ -1709,15 +2011,20 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Đọc:** §3.4, §3.5.2, §3.5.3.
 - **Phạm vi:** `apps/server/src/realtime/world.gateway.ts`, `apps/server/src/session/session-end.hooks.ts`, test.
 - **Contract:** handler `world:ping`, `world:join`, `world:leave`, `world:resync`, `server:switch`, chạy trong `UserMutex`. `realtime/world-state.builder.ts` dựng `WorldState` đủ field ngay từ task này: `shops`, `plots`, `wallet` đọc thẳng từ DB (chỉ đọc); `acceptingOrders=false`, `onlineStaff=0`, `myOpenOrders=[]`, `staff=null` là giá trị tạm, được M3-E1-T2, M3-E2-T6, M4-E1-T6 thay thế. `SessionEndHooks.register(fn: (e: SessionEndedEvent) => Promise<void>)`; các module sau đăng ký vào đây. Thứ tự sau commit theo sơ đồ §3.5.3.
-- **Test (viết trước) với 2-3 `socket.io-client` thật:** A vào thấy B qua `player:joined`; A nhận đúng `WorldState`, không có email; mở socket thứ 2 không join thì socket 1 vẫn chạy; socket 2 join thì socket 1 nhận `session:replaced{NEW_TAB}` rồi bị ngắt, và B **không** nhận `player:left`; switch: A rời room cũ, người ở server cũ nhận `player:left`, người ở server mới nhận `player:joined`; socket cũ gửi `player:move` không có tác dụng; `world:join` lặp là an toàn; chat ở server A không tới server B.
+- **Test (viết trước) với 2-3 `socket.io-client` thật:** A vào thấy B qua `player:joined`; A nhận đúng `WorldState`, không có `username`; khách vào world, di chuyển và chat được; mở socket thứ 2 không join thì socket 1 vẫn chạy; socket 2 join thì socket 1 nhận `session:replaced{NEW_TAB}` rồi bị ngắt, và B **không** nhận `player:left`; switch: A rời room cũ, người ở server cũ nhận `player:left`, người ở server mới nhận `player:joined`; socket cũ gửi `player:move` không có tác dụng; `world:join` lặp là an toàn; chat ở server A không tới server B.
 - **AC:** không có khoảng thời gian user ở trong 2 room server.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/world-gateway.spec.ts`.
 
 #### M1-E3-T5 — Reconnect, dọn khi khởi động [HR]
-- **Đọc:** §3.5.2 bảng tình huống.
-- **Phạm vi:** `apps/server/src/realtime/world.gateway.ts`, `apps/server/src/session/reconnect.service.ts`, test.
-- **Contract:** `disconnect` đặt timer `reconnectGraceSeconds`, phát `player:interacted{state:'DISCONNECTED'}`. Hết hạn thì `leave(..., GRACE_EXPIRED)`. `world:join` với `resumeSessionId` đúng thì hủy timer. Timer chạy trong `UserMutex` và **kiểm tra lại** session còn mất kết nối trước khi kết thúc, để không đua với lần nối lại. Timer dùng hàm thời gian tiêm được để test. `onApplicationBootstrap` gọi `endAllOnBoot`. `onModuleDestroy` dọn timer.
-- **Test (viết trước):** ngắt rồi nối lại trong grace: cùng `sessionId`, giữ ghế, không có `player:left`; quá grace: có `player:left` và hook chạy đúng một lần; `resumeSessionId` của người khác bị bỏ qua, tạo session mới; ngắt khi socket khác đã chiếm thì không kết thúc session; có session ACTIVE lúc boot thì thành ENDED.
+- **Đọc:** §3.5.2 bảng tình huống, §3.10.4, §3.10.5.
+- **Phạm vi:** `apps/server/src/realtime/world.gateway.ts`, `apps/server/src/session/reconnect.service.ts`, `apps/server/src/core/boot-tasks.ts`, test.
+- **Contract:** `disconnect` đặt timer `reconnectGraceSeconds`, phát `player:interacted{state:'DISCONNECTED'}`. Hết hạn thì `leave(..., GRACE_EXPIRED)`. `world:join` với `resumeSessionId` đúng thì hủy timer. Timer chạy trong `UserMutex` và **kiểm tra lại** session còn mất kết nối trước khi kết thúc, để không đua với lần nối lại. Timer dùng hàm thời gian tiêm được để test. `onModuleDestroy` dọn timer, không kết thúc session.
+  ```ts
+  // core/boot-tasks.ts: provider toàn cục
+  class BootTasks { register(order: number, name: string, fn: (now: Date) => Promise<void>): void; run(now: Date): Promise<void> } // chạy tuần tự theo order; lỗi thì ném tiếp
+  ```
+  Module session đăng ký `register(10, 'end-sessions', () => endAllOnBoot())` trong `onModuleInit`. Không dùng `onApplicationBootstrap`.
+- **Test (viết trước):** ngắt rồi nối lại trong grace: cùng `sessionId`, giữ ghế, không có `player:left`; quá grace: có `player:left` và hook chạy đúng một lần; `resumeSessionId` của người khác bị bỏ qua, tạo session mới; ngắt khi socket khác đã chiếm thì không kết thúc session; có session ACTIVE thì `BootTasks.run` làm nó ENDED với `SERVER_RESTART`; `BootTasks` chạy đúng thứ tự `order`, task lỗi làm `run` ném lỗi.
 - **AC:** không để timer sống sau `app.close()`.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/reconnect.spec.ts`.
 
@@ -1740,7 +2047,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M1-E4-T3 — `PresenceStore`, movement
 - **Đọc:** §3.4 (`player:move`, `player:moved`), §3.9.
 - **Phạm vi:** `apps/server/src/world/{presence.store.ts,movement.service.ts,world-tick.service.ts}`, `apps/server/src/realtime/world.gateway.ts`, test.
-- **Contract:** `PresenceStore`: `add`, `remove`, `get`, `listByServer`, `countByServer`, `markDirty`, `drainDirty`. Cài `OnlineCounter` thật. `MovementService.apply(player, req, nowMs): 'ok' | 'corrected'`. Tốc độ tối đa 160 px/giây; hợp lệ khi `dist ≤ speed × Δt × 1.25 + 16`, ô đích đi được, `seq` tăng dần (`seq` cũ bị bỏ qua), không đang ngồi. Tick 100 ms: gộp vị trí mới, `volatile` tới room; bản sửa gửi riêng, không volatile. Vị trí chỉ ghi DB (`lastX`, `lastY`) khi kết thúc session.
+- **Contract:** `PresenceStore`: `add`, `remove`, `get`, `listByServer`, `countByServer`, `markDirty`, `drainDirty`. Cài `OnlineCounter` thật. `MovementService.apply(player, req, nowMs): 'ok' | 'corrected'`. Tốc độ tối đa 160 px/giây; hợp lệ khi `dist ≤ speed × Δt × 1.25 + 16`, ô đích đi được, `seq` tăng dần (`seq` cũ bị bỏ qua), không đang ngồi. Tick 100 ms: gộp vị trí mới, `volatile` tới room; bản sửa gửi riêng, không volatile. Vị trí chỉ ghi DB (`lastX`, `lastY`) khi kết thúc session. Giữ nguyên thiết kế này; tải trên 0.1 CPU là điểm phải đo ở M6-E3-T2 (§3.10.7).
 - **Test:** đúng tốc độ thì OK; dịch chuyển tức thời bị sửa về vị trí cũ; vào ô tường bị sửa; seq cũ bị bỏ; đang ngồi bị bỏ; tick không phát nếu không đổi; 1 tick gộp nhiều người; 2 client tích hợp thấy nhau đi.
 - **AC:** `player:move` không truy cập DB.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run src/world test/integration/movement.spec.ts`.
@@ -1761,12 +2068,15 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **AC:** danh sách từ cấm trong file riêng để PO sửa.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/chat.spec.ts`.
 
-#### M1-E5-T1 — API client, auth store, login UI
-- **Đọc:** §3.3, §3.8.
+#### M1-E5-T1 — API client, auth store, màn vào
+- **Đọc:** §3.3, §3.8, §3.10.6 (quy tắc 401).
 - **Phạm vi:** `apps/web/src/{api,store,ui}/**`, `apps/web/src/theme/**`.
-- **Contract:** `api.ts`: `request<T>(path, opts)`, tự refresh 1 lần khi nhận 401, lỗi ném `ApiError{code,message}`. Parse response bằng schema shared. Store zustand: `authStore {user, accessToken, login, register, logout, bootstrap}`. Access token chỉ trong bộ nhớ, không `localStorage`. Màn: Login, Register. Component `Panel`, `Button`, `Field` dùng token. Thông báo lỗi theo mã bằng tiếng Việt trong `ui/errorText.ts`, mọi `ErrorCode` phải có.
-- **Test:** vitest + Testing Library: lỗi API hiện đúng tiếng Việt; refresh 1 lần rồi gọi lại; `errorText` đủ mọi mã; test tương phản 4.5:1 theo §3.8.
-- **AC:** không có token trong `localStorage`.
+- **Contract:** `api.ts`: `request<T>(path, opts)`, tự refresh 1 lần khi nhận 401, lỗi ném `ApiError{code,message}`. Parse response bằng schema shared. Store zustand: `authStore {user, accessToken, enterAsGuest, login, upgrade, logout, bootstrap}`. Access token chỉ trong bộ nhớ, không `localStorage`. Màn:
+  - `EntryScreen`: ô tên, chọn 1 trong 4 nhân vật, nút "Vào uống trà đá" gọi `POST /auth/guest`; link "Đã có tài khoản? Đăng nhập".
+  - `LoginScreen`: `username`, mật khẩu; không có link quên mật khẩu, hiện dòng "Quên mật khẩu thì nhờ admin đặt lại".
+  - Component `Panel`, `Button`, `Field` dùng token. Thông báo lỗi theo mã bằng tiếng Việt trong `ui/errorText.ts`, mọi `ErrorCode` phải có.
+- **Test:** vitest + Testing Library: lỗi API hiện đúng tiếng Việt; refresh 1 lần rồi gọi lại; `bootstrap` có cookie hợp lệ thì bỏ qua `EntryScreen`; `errorText` đủ mọi mã; test tương phản 4.5:1 theo §3.8.
+- **AC:** không có token trong `localStorage`. Không có màn đăng ký riêng.
 - **Verify:** `pnpm --filter @tdvh/web exec vitest run src/ui src/api`.
 
 #### M1-E5-T2 — Màn chọn server
@@ -1780,7 +2090,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M1-E5-T3 — Socket client, reconnect, world store
 - **Đọc:** §3.4, §3.5.2.
 - **Phạm vi:** `apps/web/src/socket/**`, `apps/web/src/store/worldStore.ts`.
-- **Contract:** `createSocket(getToken): TypedSocket`. `emitAck(event, payload, {timeoutMs: 5000, retries: 0|2})`. Khi mất kết nối: refresh token, nối lại, gọi `world:join` với `resumeSessionId`, thay toàn bộ store bằng `WorldState`. Khi nhận `session:replaced`: đặt `sessionLost=true`, **tắt tự kết nối lại**. Bỏ `wallet:updated` và đơn có version cũ. `sessionId` giữ trong `sessionStorage`.
+- **Contract:** `createSocket(getToken): TypedSocket`, kết nối cùng origin. `emitAck(event, payload, {timeoutMs: 5000, retries: 0|2})`. Khi mất kết nối với lý do `transport close` hoặc `ping timeout`: refresh token, nối lại, gọi `world:join` với `resumeSessionId`, thay toàn bộ store bằng `WorldState`. Lý do `io server disconnect` (ban, logout, `session:replaced`) thì không tự nối lại. Khi nhận `session:replaced`: đặt `sessionLost=true`, **tắt tự kết nối lại**. Bỏ `wallet:updated` và đơn có version cũ. `sessionId` giữ trong `sessionStorage`.
 - **Test:** mock socket: chuỗi reconnect đúng; `session:replaced` không kết nối lại; version cũ bị bỏ; version mới được áp dụng; event đến trước khi có state được đệm hoặc bỏ an toàn.
 - **AC:** store không chứa dữ liệu ngoài contract.
 - **Verify:** `pnpm --filter @tdvh/web exec vitest run src/socket src/store`.
@@ -1812,31 +2122,113 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M1-E5-T7 — E2E exit M1
 - **Đọc:** Exit M1.
 - **Phạm vi:** `apps/web/e2e/**`, `apps/web/playwright.config.ts`, `package.json` script `e2e`.
-- **Test:** 2 context: đăng ký → chọn server → thấy nhau → một người di chuyển, người kia thấy vị trí đổi → chat tới nhau. F5 giữ phiên và trở lại đúng server. Tab 2 chiếm phiên, tab 1 hiện "Chơi ở tab này". Chuyển server: người ở lại thấy người kia biến mất.
-- **AC:** script tự khởi động server, web và DB test; chạy lặp 3 lần đều đạt.
+- **Test:** 2 context: nhập tên, chọn nhân vật → chọn server → thấy nhau → một người di chuyển, người kia thấy vị trí đổi → chat tới nhau. F5 giữ phiên và trở lại đúng server. Tab 2 chiếm phiên, tab 1 hiện "Chơi ở tab này". Chuyển server: người ở lại thấy người kia biến mất. Tạo tài khoản bằng nút HUD, đăng xuất, đăng nhập lại bằng `username`: cùng tên và nhân vật.
+- **AC:** script tự khởi động server, web và DB test với `GAME_guestsPerIpPerDay=1000`, trừ khi có `PLAYWRIGHT_BASE_URL` thì chạy thẳng trên URL đó. Tên người chơi trong test ngẫu nhiên vì `displayNameKey` unique. Chạy lặp 3 lần đều đạt.
 - **Verify:** `pnpm e2e`.
 
-**Làn song song M1:** {E2-T1, E4-T1, E4-T2} ‖ E1; {E4-T3} trước E3-T4; sau E3-T4: {E4-T4, E4-T5} ‖ {E5-T1, E5-T2}.
+#### M1-E5-T8 — Form tạo tài khoản, nút HUD, cảnh báo khách
+- **Đọc:** §3.3 "Quy tắc tài khoản", §3.7 (đoạn tài khoản khách).
+- **Phạm vi:** `apps/web/src/ui/{UpgradeDialog*,AccountBadge*}.tsx`, `apps/web/src/store/authStore.ts`.
+- **Contract:**
+  - `UpgradeDialog`: `username`, mật khẩu, nút xác nhận; gọi `authStore.upgrade`. Hiện lỗi `USERNAME_TAKEN`, `ALREADY_REGISTERED` tại form.
+  - `AccountBadge` trên HUD: khi `user.kind==='GUEST'` có nút "Tạo tài khoản" và dòng cảnh báo "Tài khoản khách lưu trên trình duyệt này. Xóa cookie là mất nhân vật và Xu." Đăng xuất với khách phải xác nhận lại với cùng cảnh báo.
+  - `withAccountRequired(fn)` trong `apps/web/src/ui/withAccountRequired.ts`: gọi `fn`; nếu lỗi `ACCOUNT_REQUIRED` thì mở `UpgradeDialog`, nâng cấp xong gọi lại `fn` đúng một lần; đóng form thì dừng, không báo lỗi. M4-E3-T1 dùng hàm này.
+- **Test:** nâng cấp thành công thì badge đổi và không còn cảnh báo; `withAccountRequired` mở form rồi gọi lại đúng một lần; đóng form không gọi lại; REGISTERED không thấy nút; khách đăng xuất phải xác nhận.
+- **AC:** không có email hay mục "quên mật khẩu" trong form.
+- **Verify:** `pnpm --filter @tdvh/web exec vitest run src/ui/UpgradeDialog src/ui/AccountBadge src/ui/withAccountRequired`.
+
+#### M1-E5-T9 — Cold start, `world:ping` giữ thức
+- **Đọc:** §3.10.6 toàn bộ.
+- **Phạm vi:** `apps/web/src/store/connectivityStore.ts`, `apps/web/src/api/**`, `apps/web/src/socket/{createSocket.ts,keepAwake.ts}`, `apps/web/src/ui/ColdStartScreen*.tsx`.
+- **Contract:**
+  - `connectivityStore { status: 'ok' | 'waking'; since: number | null; markWaking(); markOk() }`.
+  - `api.ts`: lỗi mạng, 502/503/504, hoặc body không phải JSON trên `/api/*` thì `markWaking()` và ném `ApiError{code:'SERVICE_WAKING'}` (mã nội bộ của client, không thêm vào `ERROR_CODES`). 401 giữ nguyên hành vi cũ.
+  - `waitUntilAwake()`: gọi `GET /api/v1/health` mỗi 5 giây; đạt thì `markOk()`; quá 180 giây thì dừng và hiện nút "Thử lại".
+  - `bootstrap`: chờ `waitUntilAwake()` khi gặp `SERVICE_WAKING`, rồi refresh lại; **không** coi là chưa đăng nhập.
+  - `ColdStartScreen`: "Quán đang mở cửa, chờ khoảng 1 phút", hiện khi `status==='waking'`.
+  - Socket: tùy chọn §3.10.6; không nối lại được sau 5 giây thì `markWaking()`; `connect` thì `markOk()`.
+  - `keepAwake.ts`: `startKeepAwake(socket, {intervalMs: 300000, isVisible, setTimer})`, gửi `world:ping` khi socket đang nối và tab hiển thị; tab ẩn thì không gửi; tab hiện lại thì đặt lại chu kỳ. Không ngắt socket khi tab ẩn (I12).
+- **Test:** 502 và body HTML đều vào `waking`; 401 không vào `waking`; refresh bị 503 thì **không** về `EntryScreen`, health đạt thì trở lại đúng phiên; `POST /auth/guest` bị 503 không tự gửi lại; quá 180 giây hiện nút "Thử lại"; socket nối lại xong thì màn chờ biến mất; `keepAwake` với timer giả: tab hiển thị gửi đúng chu kỳ, tab ẩn không gửi, socket ngắt không gửi.
+- **AC:** không có URL ngoài repo, không gọi pinger ngoài.
+- **Verify:** `pnpm --filter @tdvh/web exec vitest run src/api src/socket src/ui/ColdStartScreen src/store/connectivityStore`.
+
+#### M1-E6-T1 — Chạy sau proxy, `startApp`, tắt gọn [HR]
+- **Đọc:** §3.10.2, §3.10.4; `apps/server/src/{main.ts,app.setup.ts}` hiện tại.
+- **Phạm vi:** `apps/server/src/{main.ts,app.setup.ts}`, `apps/server/src/realtime/world.gateway.ts`, `apps/server/test/integration/{proxy.spec.ts,boot-shutdown.spec.ts}`.
+- **Contract:** `NestFactory.create<NestExpressApplication>`. `configureApp(app)` (đã có) thêm `app.set('trust proxy', 1)`. `export async function startApp(app, port: number): Promise<void>` đúng 3 dòng §3.10.4. `main.ts`: `configureApp`, `app.enableShutdownHooks()`, `startApp(app, Number(process.env.PORT ?? 3000))`; `enableShutdownHooks` chỉ ở `main.ts`, không trong `configureApp`, vì test tạo nhiều app. Gateway có `beforeApplicationShutdown()` gọi `this.server.close()`. Không cập nhật `ServerSession` khi tắt.
+- **Test (viết trước):**
+  - `X-Forwarded-For: 1.1.1.1` vượt giới hạn `/auth/login` thì `RATE_LIMITED`, nhưng `X-Forwarded-For: 2.2.2.2` vẫn qua: giới hạn tách theo IP.
+  - `X-Forwarded-For: 9.9.9.9, 1.1.1.1` và `8.8.8.8, 1.1.1.1` dùng chung một bộ đếm: phần tử giả mạo phía trước bị bỏ qua.
+  - Giới hạn khách theo ngày cũng tách theo `X-Forwarded-For`.
+  - `startApp`: có session ACTIVE thì đến lúc nhận được `GET /health` đầu tiên session đã ENDED; `BootTasks` lỗi thì `startApp` ném lỗi và cổng không mở.
+  - `app.close()` khi có socket thật: client nhận `disconnect` với lý do khác `io server disconnect`; session trong DB vẫn ACTIVE; đơn trong transaction đang chạy hoàn tất; không còn timer.
+  - Cổng lấy từ tham số; server listen trên `0.0.0.0`.
+- **AC:** mọi giới hạn theo IP chỉ đọc `req.ip`. Tín hiệu thật được kiểm ở M1-E6-T3 và M1-E6-T4.
+- **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/proxy.spec.ts test/integration/boot-shutdown.spec.ts`.
+
+#### M1-E6-T2 — Phục vụ web cùng origin, CSP, bỏ CORS
+- **Đọc:** §3.10.2.
+- **Phạm vi:** `apps/server/src/app.setup.ts`, `apps/server/package.json` (helmet theo version §3.1), `apps/server/.env.example`, `apps/server/.env.test`, `apps/server/test/integration/static.spec.ts`, `apps/web/e2e/prod-serve.spec.ts`.
+- **Contract:** trong `configureApp`, trước khi Nest đăng ký route:
+  - `helmet` với CSP tường minh: `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss:; font-src 'self'; worker-src 'self' blob:; object-src 'none'`.
+  - Thư mục web: env `WEB_DIST_DIR`, mặc định `path.resolve(import.meta.dirname, '../../web/dist')`. Không có `index.html`: nếu `NODE_ENV==='production'` thì ném lỗi; ngược lại bỏ qua phần static (dev dùng Vite, test API không cần).
+  - `useStaticAssets(dir, { index: false, setHeaders })`: file `.html` gửi `Cache-Control: no-cache`, file khác `public, max-age=3600`.
+  - SPA fallback bằng `app.use`: chỉ GET/HEAD, `Accept` có `text/html`, đường dẫn không bắt đầu bằng `/api/` hoặc `/socket.io`, đoạn cuối không có dấu chấm; thỏa thì `res.sendFile(index.html)`, không thì `next()`.
+  - Không gọi `enableCors`. Gateway không khai báo `cors`. Xóa `CORS_ORIGIN` khỏi `apps/server/.env.example` và `apps/server/.env.test`.
+- **Test:** dùng thư mục fixture qua `WEB_DIST_DIR`: `GET /` có `no-cache`; `GET /servers/abc` với `Accept: text/html` trả `index.html`; `GET /assets/khong-co.png` 404; `GET /api/v1/khong-co` 404 dạng JSON, không phải HTML; `GET /api/v1/health` JSON; `POST /` không trả `index.html`; socket client nối được cùng cổng; request có header `Origin` lạ không nhận `Access-Control-Allow-Origin`; có header CSP. Playwright `prod-serve.spec.ts`: build thật, mở `/` từ Nest, không có Vite: canvas Phaser hiện ra, vào được world, **không có lỗi CSP trong console**.
+- **AC:** `grep -rn "CORS_ORIGIN\|enableCors" apps/server` rỗng (trừ `dist`, `node_modules`). Không thêm dependency ngoài §3.1.
+- **Verify:** `pnpm -r build && pnpm --filter @tdvh/server exec vitest run test/integration/static.spec.ts && pnpm e2e -- prod-serve`.
+
+#### M1-E6-T3 — `render.yaml`, test khởi động lặp [HR]
+- **Đọc:** §3.10.3, §3.10.4; bẫy Windows ở §3.1.
+- **Phạm vi:** `render.yaml`, `scripts/render-yaml.spec.mjs`, root `package.json` (script `test:scripts`), `apps/server/test/integration/start-twice.spec.ts`.
+- **Việc:** chép `render.yaml` nguyên văn. Không tự thêm khóa.
+- **Test (viết trước):**
+  - `render-yaml.spec.mjs` (`node:test`, đọc file bằng regex, không thêm thư viện YAML): có `plan: free` ở cả web và DB; `region: singapore` ở cả hai; `postgresMajorVersion: "17"`; `healthCheckPath: /api/v1/health`; `JWT_SECRET` và `METRICS_TOKEN` dùng `generateValue: true`; `DATABASE_URL` dùng `fromDatabase`; không có `rootDir`, `preDeployCommand`; lệnh start có `exec node dist/main.js`.
+  - `start-twice.spec.ts` (spawn thật, `shell: true`, trên DB test): `pnpm exec prisma migrate deploy` hai lần liên tiếp đều thoát 0, lần 2 không áp dụng gì; `node dist/main.js` với `PORT` tự chọn lên được, `GET /api/v1/health` 200; dừng process; chạy lại lần 2 lên được; session do lần 1 tạo đã ENDED.
+  - Tín hiệu thật: `describe.runIf(process.platform !== 'win32')`: gửi SIGTERM, process thoát trong 30 giây. Đây là ngoại lệ duy nhất của quy tắc cấm bỏ qua test, vì Windows không chuyển tín hiệu; CI Linux chạy phần này.
+- **AC:** không có secret trong `render.yaml`. `pnpm verify` đạt.
+- **Verify:** `pnpm -r build && pnpm test:scripts && pnpm --filter @tdvh/server exec vitest run test/integration/start-twice.spec.ts`.
+
+#### M1-E6-T4 — Deploy smoke trên Render [F]
+- **Đọc:** §3.10 toàn bộ.
+- **Phạm vi:** `deploy/RUNBOOK.md`, `docs/deploy-smoke/<yyyy-mm-dd>.md`; không sửa code. Thiết kế sai thì dừng và báo, không tự sửa.
+- **Việc của PO (dashboard; executor không làm được):** tạo repo GitHub private và push (I10); tạo Blueprint từ `render.yaml`; xác nhận gói free; ghi ngày tạo DB.
+- **Việc của executor, chạy từ local qua external URL:** `db:seed`, `provision:server` đúng 1 server. Rồi đo và ghi bảng:
+  1. Toàn bộ 11 mục "CHƯA xác nhận" ở §3.10.1.
+  2. Build: thời lượng, version Node và pnpm trong log.
+  3. Thời gian từ lúc khởi động tới `listen`, tính riêng `prisma migrate deploy`.
+  4. Spin down: không tab nào mở, sau bao lâu log có tín hiệu tắt; request đầu tiên sau đó mất bao lâu và nhận gì (`curl`, và mở bằng trình duyệt).
+  5. Giữ thức: tab hiển thị đứng yên 20 phút thì service có ngủ không; tab ẩn 20 phút thì có ngủ không (mục 9, I12).
+  6. Cold start với tab đang mở: màn "Quán đang mở cửa" hiện đúng, tự nối lại, trở về đúng nhân vật.
+  7. Restart khi đang chơi: Manual Deploy trên dashboard; client tự nối lại; log có tín hiệu SIGTERM và tắt gọn.
+  8. IP: đăng nhập sai 11 lần từ một mạng bị `RATE_LIMITED`; một thiết bị ở mạng khác (4G) vẫn qua. Gửi `X-Forwarded-For` giả từ cùng mạng không lách được giới hạn.
+  9. Argon2: thời gian 5 lần đăng nhập, ngưỡng §3.10.7.
+- **Test:** không viết test mới. Chạy E2E hiện có trên URL thật.
+- **AC:** đủ số liệu cho cả 9 mục, ghi đúng như đo được, không suy diễn. Mục nào trái giả định của §3.10 thì nêu `BLOCKED` kèm bằng chứng; **M2 không bắt đầu** cho đến khi người điều phối quyết. Sau khi xong, PO có thể Suspend service và xóa DB (chưa có dữ liệu thật) để dừng đồng hồ 30 ngày, rồi tạo lại ở M6-E4-T4.
+- **Verify:** `PLAYWRIGHT_BASE_URL=<url> pnpm e2e -- two-players`; tệp báo cáo tồn tại.
+
+**Làn song song M1:** E3-T1 trước E1; {E2-T1, E4-T1, E4-T2} ‖ E1; {E4-T3} trước E3-T4; sau E3-T4: {E4-T4, E4-T5} ‖ {E5-T1, E5-T2}; E5-T8 ‖ E5-T9. E6 tuần tự sau E5-T7.
 
 ---
 
 ### 4.6 M2 — Economy Core
 
-**Exit:** Mọi task đạt test concurrency; đăng ký nhận starter grant; HUD hiển thị số dư; `reconcile` sạch. Toàn bộ task tiền đều HR, và chạy **tuần tự**.
+**Exit:** Mọi task đạt test concurrency; khách nhận 300 Xu, nâng cấp nhận thêm 1.700 Xu; HUD hiển thị số dư; `reconcile` sạch. Toàn bộ task tiền đều HR, và chạy **tuần tự**.
 
 | ID | Mô tả | Deps | Size | Cờ | Executor |
 |---|---|---|---|---|---|
-| M2-E1-T1 | `LedgerService.apply` | M0-E2 | M | HR | Haiku low + Opus review |
-| M2-E1-T2 | `IdempotencyService.run` | M0-E2 | S | HR | Haiku low + Opus review |
+| M2-E1-T1 | `LedgerService.apply` | M0-E2, M1-E6-T4 | M | HR | Haiku low + Opus review |
+| M2-E1-T2 | `IdempotencyService.run` | M0-E2, M1-E6-T4 | S | HR | Haiku low + Opus review |
 | M2-E1-T3 | `ReconcileService`, CLI | E1-T1 | M | HR | Haiku low + Opus review |
-| M2-E1-T4 | Starter grant, daily top-up | E1-T3, M1-E1-T1, B1 | M | HR | Haiku low + Opus review |
+| M2-E1-T4 | Grant khách, thưởng nâng cấp, daily top-up | E1-T3, M1-E1-T4 | M | HR | Haiku low + Opus review |
 | M2-E1-T5 | API ví + `wallet:updated` | E1-T4, M1-E3-T2 | S | HR | Haiku low + Opus review |
 | M2-E1-T6 | HUD ví trên client | E1-T5, M1-E5-T3 | S | | Haiku low |
 
 #### M2-E1-T1 — `LedgerService.apply` [HR]
 - **Đọc:** §3.6.1, §3.6.2, §3.6.3; `core/tx.ts`.
 - **Phạm vi:** `apps/server/src/economy/{economy.module.ts,ledger.service.ts}`, `test/concurrency/ledger.concurrency.spec.ts`, `test/integration/ledger.spec.ts`, `test/helpers/factories.ts`.
-- **Contract:** đúng chữ ký và SQL §3.6.2. `factories.ts`: `makeUser({balance?})` nạp tiền qua `ADMIN_ADJUST` để đúng sổ.
+- **Contract:** đúng chữ ký và SQL §3.6.2. `factories.ts`: `makeUser({balance?, kind?})` nạp tiền qua `ADMIN_ADJUST` để đúng sổ; `kind` mặc định `REGISTERED` có `username` ngẫu nhiên và `passwordHash` giả, `GUEST` thì cả hai null.
 - **Test (viết trước):**
   - Ví 100: 20 lần `-30` song song, đúng 3 OK, 17 `INSUFFICIENT_FUNDS`, số dư 10.
   - Hold: 20 lần `held +30`, đúng 3 OK, `available` không âm.
@@ -1865,12 +2257,12 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **AC:** chỉ đọc, không tự sửa dữ liệu.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/reconcile.spec.ts`.
 
-#### M2-E1-T4 — Starter grant, daily top-up [HR]
-- **Đọc:** §5.1 B1, §3.6.3, §3.6.4 dòng Đăng ký và Daily top-up.
-- **Phạm vi:** `apps/server/src/economy/wallet.service.ts`, `apps/server/src/auth/auth.service.ts` (chỉ thêm 1 lời gọi), test.
-- **Contract:** `WalletService.grantStarter(tx, userId)`, `claimDailyTopup(userId): Promise<{ granted: bigint; wallet: WalletView }>`. Ngày tính theo `Asia/Ho_Chi_Minh` qua `Clock`. `available = balance − held`.
-- **Test (viết trước):** đăng ký có đúng 1 bút toán `STARTER_GRANT`; 10 claim song song trong ngày: 1 lần cộng; `available ≥ floor`: `TOPUP_NOT_ELIGIBLE`; `available=120`, floor 500: cộng 380; qua ngày mới (đổi clock) claim lại được; 23:59 và 00:01 giờ VN là 2 ngày khác nhau; có hold thì tính theo `available`; reconcile sạch.
-- **AC:** top-up không bao giờ đưa `available` vượt floor.
+#### M2-E1-T4 — Grant khách, thưởng nâng cấp, daily top-up [HR]
+- **Đọc:** §5.1 B1, §3.6.3, §3.6.4 dòng Tạo khách, Nâng cấp khách, Daily top-up.
+- **Phạm vi:** `apps/server/src/economy/wallet.service.ts`, `apps/server/src/auth/auth.service.ts` (chỉ thêm 2 lời gọi), test.
+- **Contract:** `WalletService.grantGuestStarter(tx, userId)`: `STARTER_GRANT`, `+guestStarterGrant`, khóa `grant:starter:{userId}`. `WalletService.grantRegisterBonus(tx, userId)`: `STARTER_GRANT`, `+registerBonus`, khóa `grant:upgrade:{userId}`. `claimDailyTopup(userId): Promise<{ granted: bigint; wallet: WalletView }>`, gọi `assertRegistered` trước. Ngày tính bằng `vnDayKey` với `Clock`. `available = balance − held`.
+- **Test (viết trước):** tạo khách có đúng 1 bút toán `STARTER_GRANT` 300, khóa `grant:starter:*`; nâng cấp có thêm đúng 1 bút toán `STARTER_GRANT` 1700, khóa `grant:upgrade:*`, tổng 2.000 và giữ nguyên số đã tiêu; 2 upgrade song song cùng user: 1 lần thưởng; upgrade lỗi `USERNAME_TAKEN`: không có thưởng; `wallet:updated` sau khi nâng cấp; khách gọi top-up: `ACCOUNT_REQUIRED`, không có bút toán; 10 claim song song trong ngày: 1 lần cộng; `available ≥ floor`: `TOPUP_NOT_ELIGIBLE`; `available=120`, floor 500: cộng 380; qua ngày mới (đổi clock) claim lại được; 23:59 và 00:01 giờ VN là 2 ngày khác nhau; có hold thì tính theo `available`; reconcile sạch.
+- **AC:** top-up không bao giờ đưa `available` vượt floor. Không còn khóa cấu hình tên `starterGrant`.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/concurrency/topup.concurrency.spec.ts test/integration/wallet.spec.ts` (3 lần).
 
 #### M2-E1-T5 — API ví, `wallet:updated` [HR]
@@ -1884,8 +2276,8 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M2-E1-T6 — HUD ví
 - **Đọc:** §3.8; `apps/web/src/store/worldStore.ts`.
 - **Phạm vi:** `apps/web/src/ui/WalletHud*.tsx`, `WalletHistory*.tsx`.
-- **Contract:** hiển thị `available` qua `formatXu`; dòng phụ "đang giữ" khi `held > 0`; nút nhận top-up chỉ hiện khi `available < dailyTopupFloor` (từ `GET /me/wallet`).
-- **Test:** số lớn hiển thị đúng; không dùng `Number`; bỏ cập nhật version cũ.
+- **Contract:** hiển thị `available` qua `formatXu`; dòng phụ "đang giữ" khi `held > 0`; nút nhận top-up chỉ hiện khi `user.kind==='REGISTERED'` và `available < dailyTopupFloor` (từ `GET /me/wallet`).
+- **Test:** số lớn hiển thị đúng; không dùng `Number`; bỏ cập nhật version cũ; tài khoản khách không thấy nút top-up.
 - **AC:** hiển thị đúng sau reconnect.
 - **Verify:** `pnpm --filter @tdvh/web exec vitest run src/ui/Wallet`.
 
@@ -1903,7 +2295,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 | M3-E1-T2 | `StaffPresence`, `acceptingOrders` | E1-T1, M1-E4-T3 | M | HR | Haiku low + Opus review |
 | M3-E1-T3 | Client: quán trên map, panel menu | E1-T1, M1-E5-T5 | M | | Haiku low |
 | M3-E2-T1 | Tính giá đơn (hàm thuần) | E1-T1 | S | HR | Haiku low + Opus review |
-| M3-E2-T2 | `OrdersService.create` | E2-T1, E1-T2, M2-E1-T2, M2-E1-T5, B4, B6 | L | HR | Haiku low + Opus review |
+| M3-E2-T2 | `OrdersService.create` | E2-T1, E1-T2, M2-E1-T2, M2-E1-T5 | L | HR | Haiku low + Opus review |
 | M3-E2-T3 | Hủy đơn, release dùng chung | E2-T2 | M | HR | Haiku low + Opus review |
 | M3-E2-T4 | Sweeper hết hạn đơn | E2-T3 | M | HR | Haiku low + Opus review |
 | M3-E2-T5 | Hook khách rời server | E2-T3 | S | HR | Haiku low + Opus review |
@@ -1911,15 +2303,19 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 | M3-E2-T7 | Client gọi món và theo dõi đơn | E2-T6, E1-T3 | M | | Haiku low |
 
 #### M3-E1-T1 — Scope guard, API đọc quán [HR]
-- **Đọc:** §3.3 (định nghĩa Scope), §3.7.
-- **Phạm vi:** `apps/server/src/session/server-scope.guard.ts`, `apps/server/src/shops/{shops.module.ts,shops.controller.ts,shops.service.ts,staff-access.ts}`, test.
+- **Đọc:** §3.3 (định nghĩa Scope), §3.4.1 (`ShopSummary.isHiring`), §3.7.
+- **Phạm vi:** `apps/server/src/session/server-scope.guard.ts`, `apps/server/src/shops/{shops.module.ts,shops.controller.ts,shops.service.ts,staff-access.ts}`, `apps/server/src/realtime/world-state.builder.ts`, test.
 - **Contract:** `ServerScopeGuard` đặt `req.ctx: ServerContext` từ session ACTIVE; session không khớp `:serverId` trả 404. `GET .../shops`, `.../shops/:shopId`, `.../plots`.
   ```ts
   assertStaff(tx: Tx, userId: string, shopId: string): Promise<{ role: 'OWNER' | 'EMPLOYEE'; employeeId?: string }>;
   // Shop FOR SHARE; nếu không phải chủ thì ShopEmployee ACTIVE FOR SHARE; không có thì FORBIDDEN
   getRole(db, userId, shopId): Promise<'OWNER' | 'EMPLOYEE' | 'CUSTOMER'>;
+  computeIsHiring(shop: { type; isHiring }, activeToday: number, cfg: GameConfig): boolean;
+  // PLAYER_OWNED: shop.isHiring. DEFAULT: activeToday < cfg.defaultShopEmployeeCap.
+  // activeToday = số ShopEmployee ACTIVE có hiredAt >= startOfVnDay(now), để nhân viên hôm qua chưa kịp reset không làm sai số.
   ```
-- **Test (viết trước):** session ở server A gọi server B: 404; `shopId` của server khác dưới `:serverId` của mình: 404; không có session: 404; không có token: 401; response không có `ownerId` email hay treasury; quán CLOSED không có trong danh sách; `assertStaff` đúng cho chủ, nhân viên, nhân viên đã nghỉ, người ngoài.
+  `GET .../shops`, `.../shops/:shopId` và `world-state.builder.ts` đều dùng `computeIsHiring`.
+- **Test (viết trước):** session ở server A gọi server B: 404; `shopId` của server khác dưới `:serverId` của mình: 404; không có session: 404; không có token: 401; response không có `username`, `passwordHash` hay treasury; quán DEFAULT `isHiring` đúng với 0, 1, 2 nhân viên hôm nay và với 2 nhân viên được tuyển từ hôm qua (`true`); quán CLOSED không có trong danh sách; `assertStaff` đúng cho chủ, nhân viên, nhân viên đã nghỉ, người ngoài.
 - **AC:** không có truy vấn shop nào thiếu điều kiện `serverId`.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/shops-read.spec.ts`.
 
@@ -1980,10 +2376,10 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/concurrency/order-cancel.concurrency.spec.ts` (3 lần).
 
 #### M3-E2-T4 — Sweeper [HR]
-- **Đọc:** §3.5.4 (Sweeper), §3.6.1.
+- **Đọc:** §3.5.4 (Sweeper), §3.6.1, §3.10.4.
 - **Phạm vi:** `apps/server/src/orders/{order-sweeper.service.ts,order-close.ts}`, test.
-- **Contract:** `sweepOnce(now: Date): Promise<{ expired: number; released: number }>`. `OnModuleInit` đặt `setInterval`, `OnModuleDestroy` hủy, tránh chạy chồng lần. Chọn tối đa 100 id quá hạn; mỗi đơn một `withTx` khóa lại và **kiểm tra lại trạng thái**. Hai luồng: PENDING quá `expiresAt` → EXPIRED + release; ACCEPTED quá `acceptExpiresAt` → PENDING nếu chưa quá `expiresAt`, ngược lại EXPIRED + release. Việc trả đơn nằm ở hàm dùng chung `returnToPendingOrExpire(tx, order: LockedOrder, reason, now)` trong `orders/order-close.ts`: còn hạn thì về PENDING với `handlerId=null`, `acceptedAt=null`, `acceptExpiresAt=null`; hết hạn thì `closeWithRelease(EXPIRED)`. Lỗi một đơn không dừng cả lô.
-- **Test (viết trước):** dùng clock giả cho cả hai luồng; hai `sweepOnce` song song không release 2 lần; sweep đua với complete (M4 thêm phần này); sweep đua với cancel; đơn chưa hết hạn không bị đụng; có event + `wallet:updated`; reconcile sạch.
+- **Contract:** `sweepOnce(now: Date): Promise<{ scanned: number; expired: number; released: number }>`. `OnModuleInit` đặt `setInterval` và `BootTasks.register(20, 'sweep-orders', fn)`, với `fn` gọi `sweepOnce(now)` lặp lại tới khi `scanned < 100`, tối đa 50 vòng. `OnModuleDestroy` hủy, tránh chạy chồng lần. Chọn tối đa 100 id quá hạn; mỗi đơn một `withTx` khóa lại và **kiểm tra lại trạng thái**. Hai luồng: PENDING quá `expiresAt` → EXPIRED + release; ACCEPTED quá `acceptExpiresAt` → PENDING nếu chưa quá `expiresAt`, ngược lại EXPIRED + release. Việc trả đơn nằm ở hàm dùng chung `returnToPendingOrExpire(tx, order: LockedOrder, reason, now)` trong `orders/order-close.ts`: còn hạn thì về PENDING với `handlerId=null`, `acceptedAt=null`, `acceptExpiresAt=null`; hết hạn thì `closeWithRelease(EXPIRED)`. Lỗi một đơn không dừng cả lô.
+- **Test (viết trước):** dùng clock giả cho cả hai luồng; 250 đơn quá hạn lúc service ngủ: sau `BootTasks.run` không còn đơn quá hạn, tiền đã trả; hai `sweepOnce` song song không release 2 lần; sweep đua với complete (M4 thêm phần này); sweep đua với cancel; đơn chưa hết hạn không bị đụng; có event + `wallet:updated`; reconcile sạch.
 - **AC:** không có queue, không có thư viện lịch.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/concurrency/order-sweeper.concurrency.spec.ts` (3 lần).
 
@@ -2021,11 +2417,11 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 
 | ID | Mô tả | Deps | Size | Cờ | Executor |
 |---|---|---|---|---|---|
-| M4-E1-T1 | Nộp và rút đơn ứng tuyển | M3-E1-T1, B2, B7 | M | HR | Haiku low + Opus review |
+| M4-E1-T1 | Nộp và rút đơn ứng tuyển | M3-E1-T1, M1-E1-T4 | M | HR | Haiku low + Opus review |
 | M4-E1-T2 | Chủ duyệt, từ chối (R4) | E1-T1 | M | HR | Haiku low + Opus review |
-| M4-E1-T3 | Tự duyệt quán DEFAULT | E1-T2 | S | HR | Haiku low + Opus review |
+| M4-E1-T3 | Tự duyệt quán DEFAULT, cap 2 | E1-T2 | S | HR | Haiku low + Opus review |
 | M4-E1-T4 | Nghỉ, sa thải, trả đơn | E1-T2, M3-E2-T4 | M | HR | Haiku low + Opus review |
-| M4-E1-T5 | Tự giải phóng nhân viên vắng | E1-T4 | S | HR | Haiku low + Opus review |
+| M4-E1-T5 | Reset nhân viên quán DEFAULT qua ngày | E1-T3, E1-T4 | M | HR | Haiku low + Opus review |
 | M4-E1-T6 | Socket, REST employment | E1-T3, E1-T5 | M | HR | Haiku low + Opus review |
 | M4-E2-T1 | Nhận, từ chối đơn (R1) | M3-E2-T3, E1-T4 | M | HR | Haiku low + Opus review |
 | M4-E2-T2 | Settlement + hoàn tất đơn (R3) | E2-T1 | L | HR | Haiku low + Opus review |
@@ -2038,15 +2434,15 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M4-E1-T1 — Nộp, rút đơn ứng tuyển [HR]
 - **Đọc:** §3.7; §5.1 B2, B7; §3.2.3 (`EmployeeApplication_one_pending`).
 - **Phạm vi:** `apps/server/src/employment/{employment.module.ts,applications.service.ts}`, test.
-- **Contract:** `apply(ctx, req): Promise<{application; events}>`, `withdraw(userId, id)`. Kiểm tra: shop cùng server, chưa CLOSED, `isHiring`; không phải chủ; không có employment ACTIVE; PENDING < `maxPendingApplications`; không trùng. Trùng do partial unique (23505) đổi thành `ALREADY_APPLIED`. Thành công thì ghi `AuditLog`.
-- **Test (viết trước):** nhân viên nộp: `ALREADY_EMPLOYED`; chủ nộp cho quán mình: `OWNER_CANNOT_APPLY`; chủ quán A nộp cho quán B **được** [B7]; 5 lần nộp song song cùng quán: 1 OK, 4 `ALREADY_APPLIED`; quá giới hạn song song không vượt; shop server khác: `SHOP_NOT_FOUND`; rút của người khác: 404.
+- **Contract:** `apply(ctx, req): Promise<{application; events}>`, `withdraw(userId, id)`. Kiểm tra theo thứ tự: `assertRegistered` (GUEST: `ACCOUNT_REQUIRED`, đọc từ DB mỗi lần); shop cùng server, chưa CLOSED; với PLAYER_OWNED kiểm tra cột `isHiring` (`SHOP_NOT_HIRING`), với DEFAULT **không** dùng `SHOP_NOT_HIRING`, hết chỗ là `SHOP_FULL` ở M4-E1-T3; không phải chủ; không có employment ACTIVE; PENDING < `maxPendingApplications`; không trùng. Trùng do partial unique (23505) đổi thành `ALREADY_APPLIED`. Thành công thì ghi `AuditLog`.
+- **Test (viết trước):** tài khoản khách nộp: `ACCOUNT_REQUIRED`, không tạo application; khách nâng cấp giữa chừng trên cùng socket rồi nộp lại: qua kiểm tra; nhân viên nộp: `ALREADY_EMPLOYED`; chủ nộp cho quán mình: `OWNER_CANNOT_APPLY`; chủ quán A nộp cho quán B **được** [B7]; 5 lần nộp song song cùng quán: 1 OK, 4 `ALREADY_APPLIED`; quá giới hạn song song không vượt; shop server khác: `SHOP_NOT_FOUND`; rút của người khác: 404.
 - **AC:** không tạo employment ở card này.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/applications.spec.ts test/concurrency/applications.concurrency.spec.ts` (3 lần).
 
 #### M4-E1-T2 — Duyệt, từ chối [HR]
 - **Đọc:** §3.6.4 dòng Duyệt, §3.6.6 R4.
 - **Phạm vi:** `apps/server/src/employment/{applications.service.ts,employment.service.ts}`, `test/concurrency/employment.concurrency.spec.ts`.
-- **Contract:** `respond(ctx, req): Promise<{application; employee?; events}>`. Dùng `hireInTx(tx, application, decidedById | null)` để T3 tái sử dụng. Cap: `employeeCapPerShop`. `refreshUser` của `StaffPresence` sau commit.
+- **Contract:** `respond(ctx, req): Promise<{application; employee?; events}>`. Dùng `hireInTx(tx, application, decidedById | null)` để T3 tái sử dụng; `hireInTx` đặt `hiredAt` tường minh bằng `Clock`, không dựa vào default của DB, vì reset so sánh trên cột này. Cap: `employeeCapPerShop` với quán người chơi. `refreshUser` của `StaffPresence` sau commit.
 - **Test (viết trước):**
   - **R4:** 3 chủ (3 quán, cả ở server khác nhau) cùng duyệt 1 người: đúng 1 ACTIVE, 2 `APPLICANT_ALREADY_EMPLOYED`, application thành EXPIRED.
   - Cap: quán còn 1 chỗ, 5 lần duyệt song song 5 ứng viên: 1 OK, 4 `SHOP_FULL`.
@@ -2055,36 +2451,61 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **AC:** có `AuditLog`. Lịch sử không bị ghi đè.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/concurrency/employment.concurrency.spec.ts` (3 lần).
 
-#### M4-E1-T3 — Tự duyệt quán DEFAULT [HR]
-- **Đọc:** §5.1 B2; §3.7.
+#### M4-E1-T3 — Tự duyệt quán DEFAULT, cap 2 [HR]
+- **Đọc:** §5.1 B2; §3.6.4 dòng Nộp đơn quán DEFAULT; §3.7.
 - **Phạm vi:** `apps/server/src/employment/applications.service.ts`, test.
-- **Contract:** `apply` trên shop `type=DEFAULT` gọi luôn `hireInTx(tx, application, null)` cùng transaction. Bị chặn tuyển lại nếu `ShopEmployee.status='TERMINATED'` tại quán đó trong 24 giờ. `isHiring` DEFAULT tính bằng còn chỗ. Hết chỗ: `SHOP_FULL`.
-- **Test (viết trước):** nộp là thành nhân viên ngay, `decidedById=null`; 10 người cùng nộp, cap 5: đúng 5 ACTIVE; 1 người nộp đồng thời 3 quán DEFAULT: 1 ACTIVE; bị sa thải vừa rồi bị chặn; đua với chủ duyệt ở quán khác: vẫn 1 ACTIVE.
-- **AC:** không có đường nào cho client gọi `respond` trên quán DEFAULT (trả `FORBIDDEN`).
+- **Contract:** `apply` trên shop `type=DEFAULT` làm đúng các bước §3.6.4 trong một transaction, gọi `hireInTx(tx, application, null)`. Ai apply trước chiếm trước, nhờ khóa dòng `Shop`. Cap: `defaultShopEmployeeCap`. Hết chỗ: `SHOP_FULL`. Bị chặn tuyển lại nếu `ShopEmployee.status='TERMINATED'` tại quán đó trong 24 giờ. Không ghi cột `Shop.isHiring`. Sau commit: `shop:updated` vì `isHiring` có thể đổi. Phần `endStaleInTx`, `releaseEndedInTx` thêm ở M4-E1-T5.
+- **Test (viết trước):** nộp là thành nhân viên ngay, `decidedById=null`; **5 người nộp song song cùng quán, cap 2: đúng 2 OK, 3 `SHOP_FULL`**, đúng 2 ACTIVE; `isHiring` chuyển `false` khi đủ 2 và `true` khi một người nghỉ, có `shop:updated`; quán người chơi vẫn nhận tới 5; 1 người nộp đồng thời 3 quán DEFAULT: 1 ACTIVE; bị sa thải vừa rồi bị chặn; đua với chủ duyệt ở quán khác: vẫn 1 ACTIVE.
+- **AC:** không có đường nào cho client gọi `respond` trên quán DEFAULT (trả `FORBIDDEN`). Quán DEFAULT không bao giờ trả `SHOP_NOT_HIRING`.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/concurrency/default-shop-hire.concurrency.spec.ts` (3 lần).
 
 #### M4-E1-T4 — Nghỉ, sa thải [HR]
 - **Đọc:** §3.6.4 dòng Nghỉ, §3.5.4, §3.7.
 - **Phạm vi:** `apps/server/src/employment/employment.service.ts`, `apps/server/src/orders/order-close.ts` (thêm 1 hàm), test.
-- **Contract:** `resign(userId)`, `terminate(ctx, employeeId, reason)`, `adminTerminate(adminId, employeeId, reason)`, cùng dùng `endInTx(tx, employee, status, actorId, reason)`. Đơn ACCEPTED của user tại quán đi qua `releaseHandlerOrders(tx, userId, shopId, reason, now): Promise<DomainEvent[]>` (theo `id` tăng dần, gọi `returnToPendingOrExpire`), lý do `HANDLER_EMPLOYMENT_ENDED`. Sau commit: `leaveShopStaff`, `employment:updated`, `shop:order:created` cho đơn trả về.
+- **Contract:** `resign(userId)`, `terminate(ctx, employeeId, reason)`, `adminTerminate(adminId, employeeId, reason)`, cùng dùng `endInTx(tx, employee, status, actorId, reason)`. `endInTx` chỉ cập nhật `ShopEmployee` và ghi `AuditLog` (L4), **không** đụng đơn; người gọi tự gọi tiếp `releaseHandlerOrders(tx, userId, shopId, reason, now): Promise<DomainEvent[]>` (L5, L6; theo `id` tăng dần, gọi `returnToPendingOrExpire`), lý do `HANDLER_EMPLOYMENT_ENDED`. Sau commit: `leaveShopStaff`, `StaffPresence.refreshUser`, `employment:updated`, `shop:updated`, và các `DomainEvent` của đơn trả về (`shop:order:created`, `shop:order:updated`, `wallet:updated` nếu có release).
 - **Test (viết trước):** `resign` từ server khác **được** (đang ở server B); 2 `resign` song song: idempotent; chủ sa thải nhân viên quán khác: `FORBIDDEN`; sa thải đua với complete (thêm ở M4-E2-T2); sau khi nghỉ có thể ứng tuyển nơi khác; bản ghi cũ giữ nguyên.
 - **AC:** không xóa dòng nào.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/employment-end.spec.ts`.
 
-#### M4-E1-T5 — Tự giải phóng nhân viên vắng [HR]
-- **Đọc:** §5.1 B2; `order-sweeper.service.ts` làm mẫu.
-- **Phạm vi:** `apps/server/src/employment/employment-sweeper.service.ts`, test.
-- **Contract:** `sweepIdle(now)`, chạy mỗi giờ. Nhân viên ACTIVE tại **quán DEFAULT** có session gần nhất (ở server của quán) cũ hơn `defaultShopIdleReleaseDays`, tính cả lúc chưa từng vào (từ `hiredAt`) → `endInTx(AUTO_RELEASED)`. Bỏ qua người đang online.
-- **Test (viết trước):** dùng clock giả cho đúng ngưỡng; nhân viên quán PLAYER_OWNED không bị đụng; đang online không bị đụng; có audit; chạy song song 2 lần không lỗi.
-- **AC:** không chạm quán người chơi.
-- **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/employment-sweeper.spec.ts`.
+#### M4-E1-T5 — Reset nhân viên quán DEFAULT qua ngày [HR]
+- **Đọc:** §5.1 B2; §3.6.1 (đoạn reset); §3.6.4 dòng Reset và Nộp đơn quán DEFAULT; §3.10.4; `order-sweeper.service.ts` làm mẫu.
+- **Phạm vi:** `apps/server/src/employment/{default-shop-reset.service.ts,applications.service.ts}`, `apps/server/test/integration/default-shop-reset.spec.ts`, `apps/server/test/concurrency/default-shop-reset.concurrency.spec.ts`.
+- **Contract:** không thêm bảng. Giữ lịch sử: dòng `ShopEmployee` chuyển `DAILY_RESET`, không xóa.
+  ```ts
+  resetStaleDefaultEmployees(now: Date, shopId?: string): Promise<{ ended: number; ordersReleased: number }>;
+  // Có shopId: một quán. Không có: truy vấn không khóa các quán DEFAULT có nhân viên cũ, mỗi quán một withTx riêng.
+  // Trong withTx: L3 Shop FOR NO KEY UPDATE, phải type='DEFAULT' -> endStaleInTx -> releaseEndedInTx. Sau commit phát event.
+  endStaleInTx(tx: Tx, shopId: string, now: Date): Promise<EndedEmployee[]>;
+  // L4. Mọi ShopEmployee ACTIVE có hiredAt < startOfVnDay(now), theo id tăng dần, qua endInTx(DAILY_RESET, actor null, reason 'DAILY_RESET').
+  releaseEndedInTx(tx: Tx, ended: EndedEmployee[], now: Date): Promise<DomainEvent[]>;
+  // L5, L6. Mỗi người: releaseHandlerOrders(tx, userId, shopId, 'HANDLER_DAILY_RESET', now).
+  ```
+  Gọi ở **đúng 3 chỗ**:
+  1. `BootTasks.register(30, 'reset-default-shops', now => resetStaleDefaultEmployees(now))` trong `onModuleInit`: trước `listen`.
+  2. `setInterval` mỗi `defaultShopResetTickSeconds` (60 giây), tránh chạy chồng lần, hủy ở `onModuleDestroy`.
+  3. Trong transaction `apply` của quán DEFAULT theo §3.6.4: `endStaleInTx` sau khi khóa `Shop` và trước khi đếm chỗ; `releaseEndedInTx` sau `hireInTx`. Không gọi `resetStaleDefaultEmployees` ở đây vì nó mở transaction riêng.
+
+  Sau commit, với mỗi người bị reset: `leaveShopStaff`, `StaffPresence.refreshUser`, `employment:updated{status:'DAILY_RESET'}`, `shop:updated`, và `DomainEvent` của đơn trả về. Người bị reset apply lại được ngay; luật chặn 24 giờ sau `TERMINATED` giữ nguyên. Trong tối đa 60 giây sau 00:00, người làm từ hôm qua vẫn ACTIVE cho tới khi tick chạy: họ apply quán khác thì nhận `ALREADY_EMPLOYED`; apply lại đúng quán đó thì được.
+- **Test (viết trước), clock giả:**
+  - 23:59 giờ VN: nhân viên tuyển trong ngày không bị đụng. 00:01 hôm sau: `DAILY_RESET`, `endedAt` có giá trị, dòng cũ còn nguyên, có `AuditLog`.
+  - **Người được tuyển 00:00:30 không bị reset** khi chạy lúc 00:01.
+  - **Chạy reset 2 lần không đổi kết quả;** 2 lần song song không lỗi.
+  - **Server khởi động sau nửa đêm:** qua `startApp` với clock giả, tới `GET /health` đầu tiên nhân viên hôm qua đã `DAILY_RESET`, và socket đầu tiên thấy `staff=null`.
+  - **Đơn ACCEPTED được trả về:** còn hạn thì PENDING, `handlerId=null`, `ShopOrderEvent.reason='HANDLER_DAILY_RESET'`, `expiresAt` không đổi; quá hạn thì EXPIRED và trả tiền.
+  - Trong `apply` lúc 00:00:10, trước tick: quán có 2 nhân viên hôm qua, người mới nộp được nhận, 2 người cũ `DAILY_RESET`. Người cũ nộp lại ngay được nhận. Đơn cũ của họ được trả trong cùng transaction.
+  - Sau `TERMINATED` trong 24 giờ, qua ngày mới vẫn bị chặn tuyển lại.
+  - Quán PLAYER_OWNED không bị đụng. Người đang online vẫn bị reset, ra khỏi room `shop-staff`, `onlineStaff` giảm, có `shop:updated`.
+  - Đua: reset với complete cùng đơn (20 vòng): đơn COMPLETED có commission, hoặc về PENDING không có commission, không có trạng thái khác. Reset với 5 apply song song: đúng 2 ACTIVE sau đó.
+  - Mọi test kết thúc bằng `assertReconciled()`.
+- **AC:** thứ tự khóa đúng §3.6.1: không lấy L4 sau L6. Không xóa dòng nào. Không có cột hay bảng mới. Không còn `defaultShopIdleReleaseDays`, `AUTO_RELEASED`.
+- **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/default-shop-reset.spec.ts test/concurrency/default-shop-reset.concurrency.spec.ts` (3 lần).
 
 #### M4-E1-T6 — Socket, REST employment [HR]
 - **Đọc:** §3.3, §3.4.
 - **Phạm vi:** `apps/server/src/realtime/employment.gateway.ts`, `apps/server/src/employment/employment.controller.ts`, test.
 - **Contract:** `shop:apply`, `shop:application:respond`; các route `/me/employment*`, `/me/applications*`, `.../applications`, `.../employees`, `.../terminate`. `WorldState.staff` phản ánh đúng role.
-- **Test (viết trước):** `shop:application:updated` chỉ tới người nộp và chủ; `employment:updated` tới đúng user; nhân viên mới vào room `shop-staff` ngay; bị sa thải ra khỏi room ngay và không còn nhận `shop:order:created`; nhân viên không xem được `/applications`.
-- **AC:** không có email trong `ApplicationView`.
+- **Test (viết trước):** `shop:application:updated` chỉ tới người nộp và chủ; `employment:updated` tới đúng user; nhân viên mới vào room `shop-staff` ngay; bị sa thải ra khỏi room ngay và không còn nhận `shop:order:created`; nhân viên không xem được `/applications`; tài khoản khách gọi `shop:apply` nhận ack `ACCOUNT_REQUIRED`.
+- **AC:** không có `username` trong `ApplicationView`.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/employment-gateway.spec.ts`.
 
 #### M4-E2-T1 — Nhận, từ chối đơn [HR]
@@ -2142,10 +2563,10 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/fulfillment-gateway.spec.ts`.
 
 #### M4-E3-T1 — Client ứng tuyển
-- **Đọc:** §3.4, §3.8.
+- **Đọc:** §3.4, §3.8, §3.3 "Quy tắc tài khoản"; M1-E5-T8 (`withAccountRequired`).
 - **Phạm vi:** `apps/web/src/ui/{JobBoard*,MyEmployment*}.tsx`.
-- **Contract:** `ShopPanel` có tab "Tuyển dụng"; nộp đơn; trạng thái realtime; `MyEmployment` hiện nơi đang làm kể cả ở server khác, nút nghỉ việc có xác nhận.
-- **Test:** thông báo đúng `ALREADY_EMPLOYED`, `SHOP_FULL`; nghỉ việc yêu cầu xác nhận; event cập nhật giao diện.
+- **Contract:** `ShopPanel` có tab "Tuyển dụng"; nộp đơn; trạng thái realtime; `MyEmployment` hiện nơi đang làm kể cả ở server khác, nút nghỉ việc có xác nhận. Nút nộp đơn bọc trong `withAccountRequired`: tài khoản khách bấm lần đầu thì mở form tạo tài khoản, xong tự nộp lại. Quán DEFAULT có `isHiring=false` hiện "Hết chỗ (tối đa 2 người)". Nhận `employment:updated{status:'DAILY_RESET'}` thì hiện "Hết ngày làm việc. Quán đã về 0 nhân viên, bạn có thể ứng tuyển lại."
+- **Test:** thông báo đúng `ALREADY_EMPLOYED`, `SHOP_FULL`; tài khoản khách bị `ACCOUNT_REQUIRED` thì mở form, nâng cấp xong gửi lại `shop:apply` đúng một lần; `DAILY_RESET` hiện đúng thông báo và xóa `MyEmployment`; nghỉ việc yêu cầu xác nhận; event cập nhật giao diện.
 - **AC:** đang làm ở server khác hiện rõ "Bạn đang offline ở quán này".
 - **Verify:** `pnpm --filter @tdvh/web exec vitest run src/ui/JobBoard src/ui/MyEmployment`.
 
@@ -2160,7 +2581,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M4-E3-T3 — E2E vòng lặp đầy đủ
 - **Đọc:** Exit M4.
 - **Phạm vi:** `apps/web/e2e/full-loop.spec.ts`.
-- **Test:** 2 context. Người A ứng tuyển quán DEFAULT, được nhận ngay. Người B thấy quán mở, gọi Trà đá. A nhận, chờ, hoàn tất. Kiểm tra: B giảm 100 Xu, A tăng 20 Xu, treasury tăng 60 Xu, `GET /admin/economy/reconcile` sạch.
+- **Test:** 2 context, cả hai vào bằng tên và nhân vật. Người A bấm ứng tuyển quán DEFAULT, gặp form tạo tài khoản, tạo xong được nhận ngay; ví A 300 + 1.700. Người B vẫn là khách, thấy quán mở, gọi Trà đá. A nhận, chờ, hoàn tất. Kiểm tra: B giảm 100 Xu, A tăng 20 Xu, treasury tăng 60 Xu, `GET /admin/economy/reconcile` sạch.
 - **AC:** đạt 3 lần liên tiếp.
 - **Verify:** `pnpm e2e -- full-loop`.
 
@@ -2174,7 +2595,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 
 | ID | Mô tả | Deps | Size | Cờ | Executor |
 |---|---|---|---|---|---|
-| M5-E1-T1 | Mở quán tại plot (R5) | M2-E1-T2, M4-E2-T2, B8 | M | HR | Haiku low + Opus review |
+| M5-E1-T1 | Mở quán tại plot (R5) | M2-E1-T2, M4-E2-T2 | M | HR | Haiku low + Opus review |
 | M5-E1-T2 | API mua plot + phát sóng | E1-T1 | S | HR | Haiku low + Opus review |
 | M5-E1-T3 | Client mở quán | E1-T2 | M | | Haiku low |
 | M5-E2-T1 | Sửa menu và giá | E1-T1 | S | HR | Haiku low + Opus review |
@@ -2190,6 +2611,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Phạm vi:** `apps/server/src/shops/plot-purchase.service.ts`, `test/concurrency/plot.concurrency.spec.ts`.
 - **Contract:** `purchase(ctx, plotId, { shopName, clientOpId }): Promise<{ shop; wallet: WalletView; replay: boolean; events: DomainEvent[] }>`. Tên quán 3..30 ký tự, qua bộ lọc từ. Phí lấy từ `ShopPlot.openFee`, không từ client. Tạo `ShopTreasury` số dư 0, `ShopMenu` đủ món ở `defaultPrice`. `isHiring=true`, `status=OPEN`.
 - **Test (viết trước):**
+  - Tài khoản khách đủ tiền (nạp bằng factory) mua plot: `ACCOUNT_REQUIRED`, ví không đổi.
   - **R5:** 10 người đủ tiền cùng mua 1 plot: 1 OK, 9 `PLOT_TAKEN`, 9 ví không đổi.
   - 1 user mua 3 plot song song: 1 OK, 2 `SHOP_LIMIT_REACHED`, chỉ bị trừ 1 lần.
   - Cùng `clientOpId` 10 lần: 1 quán, 1 lần trừ.
@@ -2197,7 +2619,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
   - Plot RESERVED_DEFAULT: `PLOT_NOT_PURCHASABLE`. Plot server khác: `PLOT_NOT_FOUND`. Session cũ: `SESSION_STALE`.
   - Lỗi chèn giữa chừng (ép lỗi): không còn shop, treasury, menu và ví nguyên vẹn.
   - Reconcile sạch.
-- **AC:** số quán DEFAULT của server vẫn đúng 3. Nhân viên chỗ khác vẫn mở được quán nếu B7 giữ đề xuất.
+- **AC:** số quán DEFAULT của server vẫn đúng 3. Nhân viên chỗ khác vẫn mở được quán (B7).
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/concurrency/plot.concurrency.spec.ts` (3 lần).
 
 #### M5-E1-T2 — API mua plot, phát sóng [HR]
@@ -2259,7 +2681,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M5-E2-T6 — Test ma trận quyền [HR]
 - **Đọc:** §3.7 toàn bộ.
 - **Phạm vi:** `apps/server/test/integration/authz-matrix.spec.ts`, `test/helpers/world-fixture.ts`. **Không sửa code ứng dụng;** nếu một ô sai thì báo, kèm lỗi cụ thể.
-- **Contract:** bảng dữ liệu `{ action, actor, shopType, expected }`, với actor ∈ {khách, nhân viên quán này, nhân viên quán khác, chủ quán này, chủ quán khác, không có session ở server, session ở server khác, admin}; shopType ∈ {DEFAULT, PLAYER_OWNED}. Chạy qua API hoặc socket thật.
+- **Contract:** bảng dữ liệu `{ action, actor, shopType, expected }`, với actor ∈ {tài khoản khách (`GUEST`), khách mua `REGISTERED`, nhân viên quán này, nhân viên quán khác, chủ quán này, chủ quán khác, không có session ở server, session ở server khác, admin}; shopType ∈ {DEFAULT, PLAYER_OWNED}. Chạy qua API hoặc socket thật.
 - **Test:** mọi ô §3.7, mỗi ô một test tên rõ ràng. Thêm: `serverId` giả mạo trong URL; `shopId` của server khác; hành động socket sau khi đổi server.
 - **AC:** số test ≥ số ô có ý nghĩa của bảng; ô thiếu ghi rõ lý do.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/authz-matrix.spec.ts`.
@@ -2267,7 +2689,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M5-E2-T7 — E2E chủ quán
 - **Đọc:** Exit M5.
 - **Phạm vi:** `apps/web/e2e/owner-flow.spec.ts`, helper nạp tiền qua script test.
-- **Test:** A đủ tiền mở quán → B nộp đơn → A duyệt → C gọi món → B hoàn tất → A rút lợi nhuận. Hai người khác thấy quán mới không cần tải lại. Reconcile sạch.
+- **Test:** A đã nâng cấp, đủ tiền mở quán → B đã nâng cấp nộp đơn → A duyệt → C là tài khoản khách gọi món → B hoàn tất → A rút lợi nhuận. Hai người khác thấy quán mới không cần tải lại. Reconcile sạch.
 - **AC:** đạt 3 lần liên tiếp.
 - **Verify:** `pnpm e2e -- owner-flow`.
 
@@ -2277,40 +2699,40 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 
 ### 4.10 M6 — Ổn định và playtest
 
-**Exit:** Đạt mục tiêu tải đã thống nhất, không có lỗi exploit mở, backup đã khôi phục thử, MVP chạy trên môi trường playtest.
+**Exit:** Đạt mục tiêu tải đã thống nhất, không có lỗi exploit mở, backup đã khôi phục thử và xoay DB đã diễn tập, MVP chạy trên Render.
 
 | ID | Mô tả | Deps | Size | Cờ | Executor |
 |---|---|---|---|---|---|
 | M6-E1-T1 | Log có cấu trúc, requestId | M4 | S | | Haiku low |
 | M6-E1-T2 | Metrics realtime + economy | E1-T1 | M | | Haiku low |
 | M6-E1-T3 | Báo cáo economy, cặp giao dịch nghi vấn | M2-E1-T3 | S | | Haiku low |
-| M6-E2-T1 | Report chat, mute, ban | M1-E4-T5, I2 | M | HR | Haiku low + Opus review |
+| M6-E2-T1 | Report chat, mute, ban, script admin | M1-E4-T5, I2 | M | HR | Haiku low + Opus review |
 | M6-E2-T2 | Client report và ẩn người chơi | E2-T1 | S | | Haiku low |
 | M6-E3-T1 | Công cụ load test | M4 | M | | Haiku low |
-| M6-E3-T2 | Chạy load test, ghi báo cáo | E3-T1, I3 | M | F | Haiku low |
+| M6-E3-T2 | Chạy load test trên Render, ghi báo cáo | E3-T1, E4-T4, I3 | M | F | Haiku low |
 | M6-E3-T3 | Bộ test khai thác kinh tế | M5 | M | HR | Haiku low + Opus review |
 | M6-E3-T4 | Security review | M5, E2-T1 | M | HR, F | Haiku low + Opus review |
-| M6-E4-T1 | Dockerfile server, web | M5 | S | | Haiku low |
-| M6-E4-T2 | Compose production, Caddy | E4-T1, I7 | S | | Haiku low |
-| M6-E4-T3 | Backup, restore, migrate an toàn | E4-T2 | M | HR | Haiku low + Opus review |
-| M6-E4-T4 | Triển khai môi trường playtest | E4-T3, I7 | M | F | Haiku low |
+| M6-E4-T3 | `db:backup`, `db:restore`, runbook xoay DB | M5, M1-E6-T4 | M | HR | Haiku low + Opus review |
+| M6-E4-T4 | Triển khai playtest trên Render, diễn tập xoay DB | E4-T3 | M | F | Haiku low |
 | M6-E5-T1 | Tích hợp art cuối | M5, I6 | M | F | Haiku low |
 | M6-E5-T2 | Rà soát UX theo checklist | M5 | M | F | Haiku low |
 | M6-E5-T3 | Runbook playtest, chỉnh tham số | E3-T2, E4-T4 | M | F | Haiku low |
 
+M6-E4-T1 (Dockerfile) và M6-E4-T2 (Compose production, reverse proxy) đã bỏ vì deploy bằng native runtime của Render (§3.10). Hai ID này không dùng lại.
+
 #### M6-E1-T1 — Log có cấu trúc
 - **Đọc:** brief §12.
 - **Phạm vi:** `apps/server/src/core/logging/**`, `main.ts`, `realtime/event-pipeline.ts`.
-- **Contract:** `pino` JSON; mọi request và event có `requestId`, `userId`, `serverId`, `event`, `durationMs`, `errorCode`. Redact `password`, `passwordHash`, `token`, `authorization`, `cookie`, `email`, nội dung chat.
+- **Contract:** `pino` JSON ra stdout (filesystem của Render là ephemeral); mọi request và event có `requestId`, `userId`, `serverId`, `event`, `durationMs`, `errorCode`. Redact `password`, `passwordHash`, `username`, `token`, `authorization`, `cookie`, nội dung chat.
 - **Test:** log không chứa giá trị nhạy cảm (kiểm tra bằng stream giả); lỗi không xác định có stack trong log, không có trong response.
 - **AC:** không ghi `player:move` ở mức info.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run src/core/logging`.
 
 #### M6-E1-T2 — Metrics
-- **Đọc:** §3.3 (`/metrics`).
+- **Đọc:** §3.3 (`/metrics`), §3.10.7.
 - **Phạm vi:** `apps/server/src/core/metrics/**`.
-- **Contract:** `prom-client`: `tdvh_online{server}`, `tdvh_event_total{event,result}`, `tdvh_event_duration_seconds{event}`, `tdvh_event_loop_lag_seconds`, `tdvh_tx_retry_total{code}`, `tdvh_orders_total{status}`, `tdvh_ledger_minted_total`, `tdvh_ledger_burned_total`, `tdvh_reconcile_violations`. Reconcile chạy mỗi giờ. `/metrics` chỉ cho IP nội bộ.
-- **Test:** counter tăng khi có event; không có nhãn `userId` (bùng nổ cardinality); IP ngoài nhận 403; vi phạm reconcile được log mức error.
+- **Contract:** `prom-client`: `tdvh_online{server}`, `tdvh_event_total{event,result}`, `tdvh_event_duration_seconds{event}`, `tdvh_event_loop_lag_seconds`, `tdvh_tx_retry_total{code}`, `tdvh_orders_total{status}`, `tdvh_ledger_minted_total`, `tdvh_ledger_burned_total`, `tdvh_reconcile_violations`. Reconcile chạy mỗi giờ khi service còn thức (§3.10.5). `/metrics` yêu cầu `Authorization: Bearer <METRICS_TOKEN>`, so sánh bằng `crypto.timingSafeEqual`.
+- **Test:** counter tăng khi có event; không có nhãn `userId` (bùng nổ cardinality); thiếu hoặc sai token nhận 401; không đặt env `METRICS_TOKEN` thì 404; token đúng nhận 200; vi phạm reconcile được log mức error.
 - **AC:** không bắt buộc cài Prometheus/Grafana ở card này.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run src/core/metrics`.
 
@@ -2318,16 +2740,16 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Đọc:** §5.1 B1, B6; §3.6.8.
 - **Phạm vi:** `apps/server/scripts/economy-report.ts`.
 - **Contract:** in JSON và Markdown: Xu phát hành và đốt theo ngày, tổng lưu hành, Xu khóa ở treasury DEFAULT, top 20 ví, top 20 cặp `(customer, shop)` và `(customer, handler)` theo Xu/ngày, đơn trung bình/người/ngày. Chỉ đọc.
-- **Test:** fixture cho số dự kiến; cặp nghi vấn đứng đầu; không có email trong đầu ra.
+- **Test:** fixture cho số dự kiến; cặp nghi vấn đứng đầu; số Xu phát qua `grant:starter:*` và `grant:upgrade:*` tách riêng; không có `username` trong đầu ra.
 - **AC:** chạy dưới 30 giây trên dữ liệu playtest (100k dòng ledger giả).
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/economy-report.spec.ts`.
 
 #### M6-E2-T1 — Report, mute, ban [HR]
 - **Đọc:** §3.3, §5.2 I2.
 - **Phạm vi:** `apps/server/src/chat/report.service.ts`, `apps/server/src/admin/**`, test.
-- **Contract:** `POST .../chat/reports` lấy nội dung từ ring buffer (client không gửi nội dung); trùng là idempotent; hết hạn buffer: `NOT_FOUND`. Các route `/admin/*` có `RolesGuard` và `AuditLog`. Ban: session `KICKED`, ngắt socket, thu hồi refresh token.
-- **Test (viết trước):** nội dung lấy từ server; không tự report mình; PLAYER gọi `/admin/*`: 403; mute có hiệu lực ngay; hết hạn mute tự mở; ban đang online bị ngắt ngay và không đăng nhập lại được; có audit. Đơn đang mở của người bị ban đi qua hook session end.
-- **AC:** tạo admin bằng script `pnpm --filter @tdvh/server admin:promote --email=...`, không có route.
+- **Contract:** `POST .../chat/reports` lấy nội dung từ ring buffer (client không gửi nội dung); trùng là idempotent; hết hạn buffer: `NOT_FOUND`. Các route `/admin/*` có `RolesGuard` và `AuditLog`. Ban: session `KICKED`, ngắt socket, thu hồi refresh token. Script `admin:reset-password --username=<u>`: đọc mật khẩu mới từ env `NEW_PASSWORD` (không qua tham số dòng lệnh), băm bằng `PasswordService`, thu hồi mọi refresh token của user, ghi `AuditLog`; từ chối user `GUEST`.
+- **Test (viết trước):** `admin:promote` và `admin:reset-password` với `username` khác hoa thường, với user không tồn tại, với `GUEST`; đặt lại mật khẩu xong đăng nhập được bằng mật khẩu mới và refresh token cũ mất hiệu lực; nội dung lấy từ server; không tự report mình; PLAYER gọi `/admin/*`: 403; mute có hiệu lực ngay; hết hạn mute tự mở; ban đang online bị ngắt ngay và không đăng nhập lại được; có audit. Đơn đang mở của người bị ban đi qua hook session end.
+- **AC:** tạo admin bằng script `pnpm --filter @tdvh/server admin:promote --username=...`, không có route; chỉ áp dụng cho user `REGISTERED`. Hai script chạy từ local qua external URL (§3.10.8).
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/moderation.spec.ts`.
 
 #### M6-E2-T2 — Client report, ẩn người chơi
@@ -2341,24 +2763,24 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 #### M6-E3-T1 — Công cụ load test
 - **Đọc:** §3.4; ràng buộc "không bot".
 - **Phạm vi:** `tools/loadtest/**`, `tools/loadtest/README.md`.
-- **Contract:** script `socket.io-client` giả lập N kết nối **chỉ trong môi trường test**: di chuyển 10 Hz, chat 1 tin/30 giây, 1 đơn/2 phút. Từ chối chạy nếu `NODE_ENV=production` hoặc host không nằm trong danh sách cho phép. Nằm ngoài `apps/`, không được import từ code sản phẩm (thêm luật dependency-cruiser). Xuất p50/p95/p99 ack, tỉ lệ lỗi, độ trễ `player:moved`.
+- **Contract:** script `socket.io-client` giả lập N kết nối **chỉ trong môi trường test**: di chuyển 10 Hz, chat 1 tin/30 giây, 1 đơn/2 phút. Tạo user bằng `POST /auth/guest`, tên `lt<runId><n>`; 2 client đầu nâng cấp bằng `POST /auth/upgrade` rồi `shop:apply` quán DEFAULT, để các đơn có người xử lý. Từ chối chạy nếu `NODE_ENV=production` hoặc host không nằm trong danh sách cho phép (`LOADTEST_ALLOWED_HOSTS`, mặc định `localhost`). Không có script `build` để `pnpm -r build` trên Render bỏ qua. Nằm ngoài `apps/`, không được import từ code sản phẩm (thêm luật dependency-cruiser). Xuất p50/p95/p99 ack, tỉ lệ lỗi, độ trễ `player:moved`.
 - **Test:** chạy 5 kết nối 30 giây trên máy dev; guard production hoạt động.
-- **AC:** không có đường nào đưa công cụ này vào image production.
+- **AC:** không có đường nào đưa công cụ này vào code chạy production: `apps/*` không import, không nằm trong lệnh start.
 - **Verify:** `pnpm --filter loadtest start --clients=5 --seconds=30 --host=localhost`.
 
-#### M6-E3-T2 — Chạy load test [F]
-- **Đọc:** §5.2 I3, M6-E3-T1.
+#### M6-E3-T2 — Chạy load test trên Render [F]
+- **Đọc:** §5.2 I3, §3.10.7, M6-E3-T1.
 - **Phạm vi:** `docs/loadtest/<yyyy-mm-dd>.md`.
 - **Test:** không viết test mới; đây là lần đo. Kịch bản là 4 mức tải nêu trên.
-- **Việc:** chạy 25, 50, 75, 100 kết nối, mỗi mức 10 phút. Ghi bảng số liệu thô.
-- **Mục tiêu đề xuất:** ở `softCap` (50): p95 ack < 150 ms, event loop lag p99 < 50 ms, CPU < 70%, không có reconcile violation. Nêu kết quả đúng như đo được, không suy diễn nguyên nhân khi không có bằng chứng.
-- **AC:** có số liệu cả 4 mức; ghi rõ cấu hình máy. Quyết định đổi `softCap`/`hardCap` thuộc về người dùng.
-- **Verify:** tệp báo cáo tồn tại; `pnpm --filter @tdvh/server reconcile` sạch.
+- **Việc:** chạy **trên Render free**, trước khi mời người chơi, công cụ chạy từ máy local. PO đặt tạm `GAME_guestsPerIpPerDay=1000` trên dashboard và thêm host vào `LOADTEST_ALLOWED_HOSTS`, xong thì gỡ. Chạy 5, 10, 15, 25 kết nối, mỗi mức 10 phút. Ghi bảng số liệu thô, kèm `tdvh_event_loop_lag_seconds` đọc từ `/metrics` bằng token.
+- **Mục tiêu đề xuất:** ở `softCap` (15): p95 ack < 300 ms, event loop lag p99 < 100 ms, độ trễ `player:moved` p95 < 300 ms, không restart do hết 512 MB, không có reconcile violation. Render free không cho số liệu CPU qua API; lấy biểu đồ từ dashboard nếu có. Nêu kết quả đúng như đo được, không suy diễn nguyên nhân khi không có bằng chứng.
+- **AC:** có số liệu cả 4 mức; ghi rõ đây là 0.1 CPU/512 MB. Quyết định đổi `softCap`/`hardCap` thuộc về người dùng. User `lt*` nằm lại trong DB; dọn bằng cách tạo lại DB trước buổi playtest.
+- **Verify:** tệp báo cáo tồn tại; `DATABASE_URL=<external URL> pnpm --filter @tdvh/server reconcile` sạch.
 
 #### M6-E3-T3 — Bộ test khai thác kinh tế [HR]
 - **Đọc:** §3.6, §3.7, §5.1 B1, B6, I4.
 - **Phạm vi:** `apps/server/test/integration/exploits.spec.ts`. Không sửa code ứng dụng; lỗi tìm được thì báo.
-- **Test:** thêm `price`, `userId`, `serverId`, `commission` vào payload (bị loại); `quantity` âm, 0, 1e9, số thực; tiền rút `-1`, `"1e3"`, `99999999999999999999`; chủ tự mua qua tài khoản khác rồi tự xử lý (đúng luật, nhưng không tạo Xu mới và bảo toàn vẫn sạch); hai người thông đồng 100 đơn: **tổng Xu của cả nhóm giảm** đúng bằng supply + phí; vượt `commissionPairDailyCap` thì commission 0; quán DEFAULT không ai rút được; đơn đã đóng không complete được; sửa `orderId` của server khác; hủy sau khi hoàn tất; top-up trùng; đăng ký liên tục bị rate limit; replay key trên user khác không chạy được.
+- **Test:** thêm `price`, `userId`, `serverId`, `commission` vào payload (bị loại); `quantity` âm, 0, 1e9, số thực; tiền rút `-1`, `"1e3"`, `99999999999999999999`; chủ tự mua qua tài khoản khác rồi tự xử lý (đúng luật, nhưng không tạo Xu mới và bảo toàn vẫn sạch); hai người thông đồng 100 đơn: **tổng Xu của cả nhóm giảm** đúng bằng supply + phí; vượt `commissionPairDailyCap` thì commission 0; quán DEFAULT không ai rút được; đơn đã đóng không complete được; sửa `orderId` của server khác; hủy sau khi hoàn tất; top-up trùng; tạo khách vượt 10/ngày/IP bị chặn, kể cả đổi `X-Forwarded-For` phần đầu; nâng cấp vượt 5/phút/IP bị chặn; tài khoản khách gọi `shop:apply`, mua plot, `daily-topup` đều `ACCOUNT_REQUIRED`; thưởng nâng cấp chỉ một lần; **rửa grant khách: 10 khách chuyển 300 Xu về quán của một người qua đơn giá tối đa: tổng Xu cả nhóm giảm đúng bằng supply + phí, không tạo Xu mới**; reset quán DEFAULT không tạo hay mất Xu; replay key trên user khác không chạy được.
 - **AC:** kết thúc mỗi kịch bản bằng `assertReconciled()`.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run test/integration/exploits.spec.ts`.
 
@@ -2366,40 +2788,25 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Đọc:** toàn bộ §3.3, §3.4, §3.7; brief §6.3, §7.4.
 - **Phạm vi:** `docs/security-review.md`, `apps/server/test/integration/routes-guarded.spec.ts`; không sửa code ứng dụng. Mỗi lỗi thành một task mới cho người điều phối.
 - **Test:** thêm `test/integration/routes-guarded.spec.ts`: liệt kê mọi route Nest, route nào không công khai mà thiếu guard thì fail.
-- **Việc:** checklist: helmet, CORS đúng origin, cookie flag, argon2, không có secret trong repo (`git log` có kiểm tra), rate limit auth, authz trên mọi route (liệt kê tự động), XSS ở chat và tên, kích thước payload socket `maxHttpBufferSize=16 KB`, DoS kết nối theo IP, `pnpm audit`.
+- **Việc:** checklist: helmet và CSP, không có header CORS, `trust proxy` đúng và mọi giới hạn dùng `req.ip`, `/metrics` có token, không có `username` trong payload công khai, cookie flag, argon2, không có secret trong repo (`git log` có kiểm tra), rate limit auth, authz trên mọi route (liệt kê tự động), XSS ở chat và tên, kích thước payload socket `maxHttpBufferSize=16 KB`, DoS kết nối theo IP (plan không có giới hạn này; ghi "Không áp dụng" kèm lý do §3.10.2), `pnpm audit`.
 - **AC:** mỗi mục có Đạt / Không đạt / Không áp dụng kèm bằng chứng file:dòng.
 - **Verify:** `pnpm audit --prod` và tệp báo cáo tồn tại.
 
-#### M6-E4-T1 — Dockerfile
-- **Đọc:** §3.1.
-- **Phạm vi:** `apps/server/Dockerfile`, `apps/web/Dockerfile`, `.dockerignore`.
-- **Contract:** multi-stage trên `node:24-alpine`, `pnpm deploy --prod`; chạy user không phải root; image server gồm Prisma client và thư mục migrations; web build static phục vụ bằng Caddy.
-- **Test:** build 2 image; `GET /health` trong container; image không chứa `.env`, `tools/`, `test/`.
-- **AC:** không dùng tag `latest`.
-- **Verify:** `docker build -f apps/server/Dockerfile -t tdvh-server:test . && docker build -f apps/web/Dockerfile -t tdvh-web:test .`.
+#### M6-E4-T3 — `db:backup`, `db:restore`, runbook xoay DB [HR]
+- **Đọc:** §3.2.3 (Rollback), §3.10.8 toàn bộ.
+- **Phạm vi:** `scripts/{db-backup.mjs,db-restore.mjs,db-restore-drill.mjs}`, root `package.json` (`db:backup`, `db:restore`, `db:restore-drill`), `.gitignore` (thêm `backups/`), `deploy/RUNBOOK.md`.
+- **Contract:** theo §3.10.8. Hai script spawn `docker run --rm` với image `postgres:17-alpine` qua mảng tham số Node, mount thư mục `backups/`, không in URL hay mật khẩu ra log. `db:backup` đọc `RENDER_EXTERNAL_DATABASE_URL` từ `.env.render`. `db:restore <file> --target=<url>` từ chối nếu thiếu `--target`, và từ chối nếu DB đích đã có bảng. `deploy/RUNBOOK.md` mở đầu bằng bảng ngày tạo DB và ngày phải xoay; có đủ runbook 10 bước §3.10.8, cách chạy script admin từ local, và cảnh báo mất dữ liệu.
+- **Test (viết trước):** `db:restore-drill` trên DB test (port 5433): tạo dữ liệu qua factories, backup, restore vào database mới `tdvh_restore_check`; so sánh số dòng các bảng; `reconcile` sạch trên DB đã restore; test raw constraint (M0-E2-T2) vẫn đạt trên DB đã restore; trigger ledger vẫn chặn `UPDATE`; `prisma migrate deploy` trên DB đã restore là no-op. Thêm: `db:restore` không có `--target` và với DB đích có bảng đều thoát mã khác 0, không đổi dữ liệu.
+- **AC:** kết quả diễn tập được ghi trong `deploy/RUNBOOK.md`. `backups/` và `.env.render` không commit.
+- **Verify:** `pnpm test:db:up && pnpm db:restore-drill`.
 
-#### M6-E4-T2 — Compose production
-- **Đọc:** §5.2 I7.
-- **Phạm vi:** `deploy/docker-compose.prod.yml`, `deploy/Caddyfile`, `deploy/.env.example`, `deploy/README.md`.
-- **Contract:** Caddy (HTTPS, proxy `/api` và `/socket.io` có WebSocket, static web), server, postgres có volume. `/metrics` không ra ngoài. Postgres không mở port ra ngoài. Tiến trình migrate chạy một lần trước khi server khởi động.
-- **Test:** chạy local bằng profile HTTP, đăng ký và vào world được qua Caddy.
-- **AC:** không có secret trong file.
-- **Verify:** `docker compose -f deploy/docker-compose.prod.yml config`.
-
-#### M6-E4-T3 — Backup, restore, migrate an toàn [HR]
-- **Đọc:** §3.2.3 (Rollback).
-- **Phạm vi:** `deploy/scripts/{backup.sh,restore.sh,migrate.sh}`, `deploy/RUNBOOK.md`.
-- **Contract:** `pg_dump -Fc` hằng đêm, giữ 7 bản, kèm bản sao ngoài máy (đích theo I7). `migrate.sh`: backup rồi `prisma migrate deploy`. Runbook xử lý lỗi migrate bằng khôi phục từ backup.
-- **Test (viết trước):** diễn tập: tạo dữ liệu, backup, xóa DB, restore; so sánh số dòng các bảng; `reconcile` sạch; test raw constraint (M0-E2-T2) vẫn đạt trên DB đã restore.
-- **AC:** kết quả diễn tập được ghi trong `deploy/RUNBOOK.md`.
-- **Verify:** `bash deploy/scripts/restore-drill.sh`.
-
-#### M6-E4-T4 — Triển khai môi trường playtest [F]
-- **Đọc:** `deploy/README.md`, §5.2 I7.
+#### M6-E4-T4 — Triển khai playtest trên Render, diễn tập xoay DB [F]
+- **Đọc:** §3.10, `deploy/RUNBOOK.md`, kết quả M1-E6-T4.
 - **Phạm vi:** không sửa code; ghi kết quả vào `deploy/RUNBOOK.md`.
+- **Việc của PO (dashboard; cờ F):** Resume service hoặc tạo lại Blueprint; tạo DB; ghi ngày tạo DB và đặt lịch nhắc ngày 21.
+- **Việc của executor, từ local qua external URL:** `db:seed`, `provision:server` đúng 1 server, `admin:promote` một admin. **Diễn tập xoay DB đủ 10 bước** khi chưa có người chơi thật, rồi trả lời mục 7 của §3.10.1 và câu hỏi ở bước 8 của runbook.
 - **Test:** chạy lại E2E `full-loop` trên môi trường thật.
-- **Việc:** người dùng cấp máy chủ và tên miền. Chạy compose, provision đúng 1 server, tạo admin, bật backup.
-- **AC:** smoke test E2E trỏ tới môi trường này đạt; server có đúng 3 quán.
+- **AC:** smoke test E2E trỏ tới môi trường này đạt; server có đúng 3 quán; `pnpm db:backup` đã chạy được; runbook đã được diễn tập và ghi lại thời lượng ngừng phục vụ.
 - **Verify:** `PLAYWRIGHT_BASE_URL=<url> pnpm e2e -- full-loop`.
 
 #### M6-E5-T1 — Tích hợp art cuối [F]
@@ -2426,7 +2833,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **AC:** có bảng 5 giả thuyết ở brief §2.1 kèm số liệu; đề xuất tham số do người phân tích, không phải executor, ký xác nhận.
 - **Verify:** tệp báo cáo tồn tại; reconcile trên môi trường playtest sạch.
 
-**Làn song song M6:** {E1, E2, E4-T1, E4-T2, E5-T2} chạy song song. E3-T3 và E3-T4 chạy sau khi tính năng đã đóng băng.
+**Làn song song M6:** {E1, E2, E4-T3, E5-T2} chạy song song. E3-T3 và E3-T4 chạy sau khi tính năng đã đóng băng. E3-T2 chạy sau E4-T4.
 
 ### 4.11 Task không hoàn toàn phù hợp với Haiku low
 
@@ -2437,7 +2844,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 | M6-E3-T4 Security review | Bản chất là phán đoán, không phải làm theo thủ tục. Haiku low có thể tích sai checklist và Opus review khi đó chỉ kiểm tra lại một báo cáo yếu | Giao thẳng cho Opus; Haiku chỉ sinh danh sách route tự động |
 | M6-E5-T1 Art cuối | Haiku không vẽ được art. Phần việc của nó chỉ là đặt file vào đúng key | Người hoặc họa sĩ làm art theo I6; Haiku chỉ thay file và chạy test |
 | M6-E5-T3 Playtest và chỉnh tham số | Cần con người chơi thử; chỉnh economy là quyết định sản phẩm | PO điều hành; Haiku chỉ soạn runbook và chạy báo cáo |
-| M6-E4-T4 Triển khai | Cần thông tin đăng nhập máy chủ, tên miền, DNS; lỗi tốn kém | Người làm, hoặc có người giám sát trực tiếp |
+| M1-E6-T4 Deploy smoke, M6-E4-T4 Triển khai | PO phải thao tác trên dashboard Render; xoay DB có bước xóa không quay lại được; phán đoán kết quả đo cần người | PO làm phần dashboard và bước xóa DB; Haiku chạy lệnh và ghi số liệu |
 | M6-E3-T2 Load test | Chạy được, nhưng phân tích nguyên nhân thì không đáng tin | Haiku đo; Opus hoặc người đọc kết quả |
 | M6-E5-T2 UX | Không tự đánh giá được hình ảnh | Giữ checklist cơ học; PO duyệt ảnh chụp |
 | M1-E5-T4, T5 Phaser | Làm được theo card, nhưng "cảm giác di chuyển" cần mắt người; Phaser 4 có thể nằm ngoài kiến thức sẵn có của model | Giữ Haiku low; PO xem ảnh và thử 5 phút trước khi đóng M1. Nếu lỗi kéo dài thì chuyển model mạnh hơn |
@@ -2448,90 +2855,92 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 
 ## 5. Decisions và open questions
 
-Plan viết theo **phương án đề xuất** để task không còn phần thiết kế, nhưng **chưa có gì được chốt**. PO đánh dấu từng mục. Chọn khác đề xuất thì các card liên quan được cập nhật **trước khi** giao executor.
+**B1-B8 đã chốt ngày 05/11/2026** (B5 theo thiết kế của người điều phối); bảng phương án được giữ lại làm lý do. Các mục Important ở §5.2 còn ô ☐ vẫn là đề xuất của plan, chưa chốt. Đổi một quyết định đã chốt thì các card liên quan được cập nhật **trước khi** giao executor.
 
 ### 5.1 Blocker
 
-#### B1 — Nguồn Xu ban đầu (faucet) ☐ PO xác nhận
+#### B1 — Nguồn Xu ban đầu (faucet) ✔ Đã chốt
 
 **Khoảng trống xác nhận đúng:** brief chỉ có chuyển tiền giữa các ví và chi tiêu. Không có faucet thì mọi ví bằng 0, không ai gọi được đơn đầu tiên.
 
 | Phương án | Ưu | Nhược |
 |---|---|---|
-| **A. Starter grant + top-up khi cạn (đề xuất)** | Không bao giờ kẹt; top-up chỉ cho người gần hết tiền nên hạn chế lạm phát | Nhiều tài khoản phụ vẫn lấy được |
+| **A. Starter grant + top-up khi cạn (đã chốt)** | Không bao giờ kẹt; top-up chỉ cho người gần hết tiền nên hạn chế lạm phát | Nhiều tài khoản phụ vẫn lấy được |
 | B. Chỉ starter grant | Lạm phát thấp nhất | Tiêu hết là kẹt vĩnh viễn nếu không có việc |
 | C. Starter + daily cho mọi người | Động lực đăng nhập | Lạm phát cao nhất, tích trữ dễ |
 | D. Lương cơ bản theo thời gian làm việc | Thưởng cho nhân viên khi vắng khách | Xu từ không khí, dễ treo máy; xa nguyên tắc brief |
 
-**Đề xuất:** A: 2.000 Xu khi đăng ký; mỗi ngày (giờ VN) nhận bù lên 500 Xu nếu `available < 500`.
+**Đã chốt, chỉnh theo B5:** tài khoản khách nhận `guestStarterGrant` = 300 Xu (khóa `grant:starter:{userId}`, type `STARTER_GRANT`). Khi nâng cấp nhận thêm `registerBonus` = 1.700 Xu (khóa `grant:upgrade:{userId}`, type `STARTER_GRANT`), tổng vẫn 2.000. Mỗi ngày (giờ VN) tài khoản `REGISTERED` nhận bù lên 500 Xu nếu `available < 500`; tài khoản khách không có top-up.
 
-**Lưu ý rửa tiền:** người chơi có thể chuyển Xu từ tài khoản phụ về quán mình qua đơn giá cao. Ở `maxPrice` 300 Xu, supply 20, chủ tự xử lý, phí rút 5%: thu về 266/300, tức khoảng 88,7%. Nghĩa là **3 tài khoản mới gần đủ phí mở một quán** (2.000 × 88,7% ≈ 1.773 Xu mỗi tài khoản, với phí 5.000). Đây là kênh chuyển tiền ngầm mà brief cấm. Giảm thiểu đề xuất: playtest đóng theo danh sách mời và theo dõi báo cáo cặp giao dịch (M6-E1-T3); giới hạn chặt hơn để sau khi có dữ liệu.
+**Rủi ro rửa tiền (R11):** người chơi có thể chuyển Xu từ tài khoản phụ về quán mình qua đơn giá cao. Ở `maxPrice` 300 Xu, supply 20, chủ tự xử lý, phí rút 5%: thu về 266/300, tức khoảng 88,7%. Khách không cần email nên **tài khoản phụ dễ tạo hơn trước**. Tính theo mức trên, mỗi IP mỗi ngày có thể chuyển khoảng 10 × 266 = 2.660 Xu từ khách chưa nâng cấp, hoặc khoảng 10 × 1.773 ≈ 17.730 Xu nếu nâng cấp cả 10; **3 tài khoản đã nâng cấp gần đủ phí mở một quán** (phí 5.000). Được giảm nhờ grant nhỏ và giới hạn IP, **không chặn hết**, nhất là khi đổi IP. Giảm thiểu thêm: playtest đóng theo danh sách mời và theo dõi báo cáo cặp giao dịch (M6-E1-T3); giới hạn chặt hơn để sau khi có dữ liệu.
 
-**Nếu chọn khác:** chỉ đổi M2-E1-T4.
-
-#### B2 — Quán DEFAULT: quản trị và doanh thu ☐ PO xác nhận (brief Q1, Q2)
+#### B2 — Quán DEFAULT: quản trị và doanh thu ✔ Đã chốt (brief Q1, Q2)
 
 **Khoảng trống xác nhận đúng:** `ownerId` null nhưng brief §5.2 cần "chủ quán chấp nhận hoặc từ chối".
 
-| Vấn đề | Đề xuất | Phương án khác và trade-off |
+| Vấn đề | Đã chốt | Phương án khác và trade-off |
 |---|---|---|
 | Q1: có treasury không? | **Có treasury và ledger thật**, không có chủ | Quán demo không tiền: đơn giản hơn nhưng nhân viên không kiếm được gì và người mới không có việc |
 | Q2: có commission không? | **Có, cùng tỉ lệ** | Tỉ lệ cao hơn để làm việc ban đầu; thấp hơn để khuyến khích chuyển sang quán người chơi. Đều chỉnh được qua cấu hình sau |
-| Ai duyệt ứng viên? | **Backend tự duyệt** theo luật: còn chỗ (cap 5), không bị sa thải trong 24 giờ. Xác định, không phải AI | Admin duyệt tay: chậm, cần người trực. User hệ thống duyệt: thêm tài khoản đặc biệt mà không thêm lợi ích |
-| Ai sa thải? | **Admin qua API; tự giải phóng** sau 7 ngày vắng | Không sa thải: người bỏ việc chiếm chỗ mãi và kẹt quán |
+| Ai duyệt ứng viên? | **Backend tự duyệt** theo luật: còn chỗ, không bị sa thải trong 24 giờ. Xác định, không phải AI | Admin duyệt tay: chậm, cần người trực. User hệ thống duyệt: thêm tài khoản đặc biệt mà không thêm lợi ích |
+| Bao nhiêu chỗ? | **PO chốt: tối đa 2 nhân viên cùng lúc mỗi quán DEFAULT** (`defaultShopEmployeeCap`), ai apply trước chiếm trước, hết chỗ trả `SHOP_FULL`. `employeeCapPerShop` = 5 vẫn áp dụng cho quán người chơi | Cap cao hơn thì ít người tranh chỗ nhưng người mới khó thấy quán người chơi |
+| Ai sa thải? | **Admin qua API.** **PO chốt: qua ngày mới (00:00 giờ Asia/Ho_Chi_Minh), mọi quán DEFAULT về 0 nhân viên.** Giữ lịch sử: `ShopEmployee` chuyển `DAILY_RESET`, không xóa. Thay cơ chế tự giải phóng theo số ngày vắng | Giữ người tới khi họ nghỉ: người bỏ việc chiếm chỗ mãi và kẹt quán |
 | Lợi nhuận đi đâu? | **Ở lại treasury, không ai rút**: tiền ra khỏi lưu thông, là sink lớn nhất (đơn 100 Xu có nhân viên: 20 Xu đốt, 60 Xu khóa) | Đốt ngay: sổ gọn nhưng mất số liệu quán. Chia cho nhân viên: tăng thu nhập, giảm sink, dễ lạm phát |
 | Ai sửa menu? | **Seed; không có API** | Admin chỉnh giá: cần thêm UI, để sau |
 
-**Nếu chọn khác:** đổi M4-E1-T3, M4-E1-T5, §3.7; schema không đổi.
+**Thiết kế reset** (không thêm bảng, chạy được dù service ngủ qua nửa đêm): hàm idempotent `resetStaleDefaultEmployees(now, shopId?)` kết thúc mọi `ShopEmployee` ACTIVE tại quán DEFAULT có `hiredAt < đầu ngày VN hiện tại`, gọi khi khởi động trước `listen`, tick mỗi 60 giây, và trong transaction `apply` của quán DEFAULT. Chi tiết ở M4-E1-T5, §3.6.4. Điều kiện `hiredAt` làm người vừa được tuyển sau 00:00 không bị reset nhầm. Người bị reset apply lại được ngay; luật cấm tuyển lại 24 giờ sau `TERMINATED` giữ nguyên.
 
-#### B3 — Thời điểm trừ tiền ☐ PO xác nhận
+**Cột "hiring":** `isHiring` của quán DEFAULT tính theo còn chỗ của cap 2, không đọc cột DB (§3.4.1).
+
+#### B3 — Thời điểm trừ tiền ✔ Đã chốt
 
 **Khoảng trống xác nhận đúng:** brief trừ khi hoàn tất. Khách có thể đặt nhiều đơn vượt số dư, hết tiền trước lúc xong, nhân viên làm công cốc.
 
 | Phương án | Ưu | Nhược |
 |---|---|---|
-| **A. Giữ tiền khi tạo đơn, trừ khi hoàn tất (đề xuất)** | Hoàn tất luôn đủ tiền; nhân viên yên tâm; vẫn đúng tinh thần brief "khách bị trừ khi hoàn tất" | Thêm `heldBalance`, thêm luồng release và trường hợp cần test; tiền bị khóa tới khi đơn đóng |
+| **A. Giữ tiền khi tạo đơn, trừ khi hoàn tất (đã chốt)** | Hoàn tất luôn đủ tiền; nhân viên yên tâm; vẫn đúng tinh thần brief "khách bị trừ khi hoàn tất" | Thêm `heldBalance`, thêm luồng release và trường hợp cần test; tiền bị khóa tới khi đơn đóng |
 | B. Trừ thẳng khi tạo, hoàn khi hủy | Mô hình đơn giản, số dư hiển thị thật | Tiền rời ví khi chưa nhận hàng, khác mô tả brief; nhiều bút toán hoàn; treasury chưa nhận nên phải có tài khoản trung gian |
 | C. Theo brief: chỉ kiểm tra số dư khi tạo, trừ khi hoàn tất | Đơn giản nhất | Lỗi nghiệp vụ nêu trên; phải có xử lý đơn thất bại khi hoàn tất |
 
-**Đề xuất:** A. **Đây là thay đổi so với brief §5.3 và §6.4,** nên cần xác nhận rõ ràng.
+**Đã chốt:** A. **Đây là thay đổi so với brief §5.3 và §6.4,** PO đã chấp nhận.
 
-**Nếu chọn C:** bỏ `ORDER_HOLD*`, vẫn giữ cột; M3-E2-T2, T3, T4, M4-E2-T2 đổi; `complete` có thêm nhánh `INSUFFICIENT_FUNDS`. Quyết định **trước M0-E2** để schema đúng.
+#### B4 — Không có staff online ✔ Đã chốt (brief Q3, rủi ro 9)
 
-#### B4 — Không có staff online ☐ PO xác nhận (brief Q3, rủi ro 9)
-
-Phát hiện thêm: đề xuất này cùng với "không có NPC" nghĩa là **server mới không gọi được món cho tới khi có người vào làm**. Người đầu tiên vào luôn thấy quán tạm ngừng.
+Phát hiện thêm: quyết định này cùng với "không có NPC" nghĩa là **server mới không gọi được món cho tới khi có người vào làm**. Người đầu tiên vào luôn thấy quán tạm ngừng.
 
 | Phương án | Ưu | Nhược |
 |---|---|---|
-| **A. Tạm ngừng nhận đơn; khuyến khích ứng tuyển ngay (đề xuất)** | Đúng khuyến nghị brief §5.4; đơn không treo; đơn giản | Vắng người thì không có gì để mua. Phụ thuộc mật độ người |
+| **A. Tạm ngừng nhận đơn; khuyến khích ứng tuyển ngay (đã chốt)** | Đúng khuyến nghị brief §5.4; đơn không treo; đơn giản | Vắng người thì không có gì để mua. Phụ thuộc mật độ người |
 | B. Hàng chờ có timeout | Vẫn đặt được, khách thấy tiến triển | Tiền bị giữ 10 phút rồi thường bị hoàn, trải nghiệm tệ khi vắng |
 | C. Quầy tự phục vụ ở quán DEFAULT: khách thật tự lấy đồ, không commission, toàn bộ là sink | Giải quyết cold-start; vẫn là khách thật, không sinh đơn giả; sink tốt | Giảm nhu cầu nhân viên; gần với "tự động hoàn thành" mà brief §5.4 khuyên tránh; cần quyết định rõ |
 
-**Đề xuất:** A, cộng tập trung 1 server trong playtest, cộng Quick Join gom người. Sau buổi playtest đầu, nếu quán thường xuyên không có người thì xem lại C.
+**Đã chốt:** A, cộng tập trung 1 server trong playtest, cộng Quick Join gom người. Lưu ý: cap 2 và reset mỗi ngày (B2) làm tình huống này dễ xảy ra hơn: mỗi sáng mọi quán DEFAULT đều trống. Sau buổi playtest đầu, nếu quán thường xuyên không có người thì xem lại C.
 
-**Nếu chọn B:** bỏ kiểm tra `onlineStaff` trong M3-E2-T2. **Nếu chọn C:** thêm 1 epic nhỏ trong M4 và một migration sửa CHECK `ShopOrder_handler_required`, vì đơn COMPLETED khi đó không có handler.
+#### B5 — Hình thức đăng nhập ✔ Đã chốt: tài khoản khách + username
 
-#### B5 — Hình thức đăng nhập ☐ PO xác nhận
+Thay phương án "email + mật khẩu" ban đầu. Thiết kế do người điều phối quyết ngày 05/11/2026.
 
-| Phương án | Ưu | Nhược |
-|---|---|---|
-| **A. Email + mật khẩu, chưa xác minh email (đề xuất cho playtest)** | Không cần dịch vụ gửi mail hay tài khoản OAuth; làm nhanh | Dễ tạo nhiều tài khoản (B1); chưa có quên mật khẩu, phải admin hỗ trợ |
-| B. Thêm xác minh email | Giảm tài khoản phụ, có quên mật khẩu | Cần dịch vụ gửi mail, thêm task và chi phí |
-| C. OAuth Google | Ít ma sát, giảm tài khoản phụ | Cần client ID, phụ thuộc bên ngoài |
-| D. Guest | Không ma sát | Phá vỡ faucet; ví toàn hệ thống mất ý nghĩa nếu mất phiên. **Không nên** cho game có ví |
+| Mục | Quyết định |
+|---|---|
+| Vào game | `POST /auth/guest {displayName, avatarId}` → `{accessToken,user}`, cookie refresh như thường, tối đa 10 khách/ngày/IP. Có đủ `User`, `PlayerProfile`, `Wallet` |
+| Tài khoản | Không còn email ở bất kỳ đâu. Đăng nhập bằng `username` + mật khẩu qua `POST /auth/login`. Một đường duy nhất để có tài khoản: `POST /auth/upgrade {username,password}` từ khách, Auth, chỉ `GUEST`, 5/phút/IP; giữ nguyên user id, tên, nhân vật, ví |
+| Schema `User` | Bỏ cột email; `username String? @unique` lưu lowercase, `passwordHash String?`, `kind UserKind @default(GUEST)`. CHECK ở §3.2.3 |
+| Quy tắc nhập | `username` 3..20 ký tự, `^[a-z0-9_]+$` sau trim và lowercase. Mật khẩu 8..72 khi nâng cấp, 1..72 khi đăng nhập |
+| Tên hiển thị | `displayNameKey` vẫn unique cho mọi user kể cả khách. Thu hồi tên của khách bỏ hoang là L9 |
+| Quyền khách | Di chuyển, ngồi, chat, gọi đồ uống đều được. `ACCOUNT_REQUIRED` khi gọi `shop:apply`, mua plot, `daily-topup` |
+| Client | Bắt `ACCOUNT_REQUIRED` khi apply lần đầu thì mở form tạo tài khoản rồi apply lại; có nút tạo tài khoản chủ động ở HUD; cảnh báo mất cookie là mất nhân vật |
+| Mã lỗi | `USERNAME_TAKEN`, `ACCOUNT_REQUIRED`, `ALREADY_REGISTERED` |
+| Quên mật khẩu | Không có, vì không có email. Admin đặt lại qua script (L2, M6-E2-T1) |
 
-**Đề xuất:** A cho playtest đóng; chuyển sang B hoặc C trước khi mở công khai.
+**Hệ quả đã chấp nhận:** tài khoản phụ dễ tạo hơn (R11); khách mất cookie là mất nhân vật và ví (R24). Refresh token hết hạn sau 30 ngày không dùng nên khách bỏ game lâu cũng mất nhân vật.
 
-**Nếu chọn C:** `passwordHash` thành nullable, thêm bảng account, đổi M1-E1.
-
-#### B6 — Xử lý đơn và chống farm ☐ PO xác nhận
+#### B6 — Xử lý đơn và chống farm ✔ Đã chốt
 
 **Khoảng trống xác nhận đúng:** cột "không có nhân viên" ở §6.2 ngụ ý chủ tự xử lý nhưng brief không nói rõ. Self-dealing của nhân viên chưa bị chặn.
 
 **Phân tích:** commission tách từ tiền khách nên farm không tạo Xu. Nhân viên "tự mua tự làm" sẽ mất 80 Xu mỗi 100 Xu ở quán DEFAULT để nhận 20; ở quán người chơi nhóm thông đồng vẫn mất ít nhất 20 Xu mỗi đơn. Vì vậy không cần hệ thống chống farm nặng; cái cần chặn là tự xử lý và rửa faucet.
 
-| Quy tắc | Đề xuất | Trade-off |
+| Quy tắc | Đã chốt | Trade-off |
 |---|---|---|
 | Chủ được xử lý đơn quán mình? | **Có, không commission** (bảng §6.2) | Không cho thì quán 1 người không hoạt động được |
 | Handler ≠ khách | **Chặn ở DB (CHECK)** | Không có lý do cho phép |
@@ -2540,32 +2949,28 @@ Phát hiện thêm: đề xuất này cùng với "không có NPC" nghĩa là **
 | Cooldown | **Tối thiểu 5 giây từ lúc nhận tới lúc hoàn tất**, không thêm cooldown khác | Chặn script hoàn tất tức thì; tạo cảm giác pha trà. Thời gian dài làm chậm giờ cao điểm |
 | Giới hạn chi tiêu khách-quán | **Chưa làm; theo dõi bằng báo cáo** | Chặn rửa tiền tốt hơn nhưng có thể phạt khách quen thật |
 
-**Nếu chọn khác:** đổi M3-E2-T2, M4-E2-T2, §3.7.
+#### B7 — Vai trò kép ✔ Đã chốt
 
-#### B7 — Vai trò kép ☐ PO xác nhận
-
-| Tình huống | Đề xuất | Phương án khác |
+| Tình huống | Đã chốt | Phương án khác |
 |---|---|---|
 | Chủ quán A làm nhân viên quán B? | **Có.** Một employment toàn hệ thống vẫn đúng; không tạo Xu mới | Không cho: gọn hơn, nhưng làm giảm nguồn nhân viên khi ít người |
 | Nhân viên mở quán? | **Có, giữ employment.** Muốn thì tự nghỉ | Tự nghỉ khi mở quán: rõ ràng nhưng làm mất việc ngoài ý muốn |
 | Làm ở server A, ứng tuyển ở server B? | **Phải nghỉ trước** (brief bắt buộc). Nghỉ được từ server khác | — |
-| Chủ quán server A mở quán server B? | Xem B8 | — |
+| Chủ quán server A mở quán server B? | Không; xem B8 | — |
 
 **Rủi ro khi cho vai trò kép:** cả hai người có quán rồi làm chéo cho nhau; xét về tiền vẫn không tạo Xu.
 
-#### B8 — Plot và giới hạn quán ☐ PO xác nhận (brief Q4, Q5)
+#### B8 — Plot và giới hạn quán ✔ Đã chốt (brief Q4, Q5)
 
 | Phương án plot | Ưu | Nhược |
 |---|---|---|
-| **A. Mua đứt một lần (đề xuất MVP)** | Đơn giản, không cần job thu phí | Ít sink định kỳ; plot có thể bị bỏ không vĩnh viễn trên 4 plot/server |
+| **A. Mua đứt một lần (đã chốt cho MVP)** | Đơn giản, không cần job thu phí | Ít sink định kỳ; plot có thể bị bỏ không vĩnh viễn trên 4 plot/server |
 | B. Thuê theo chu kỳ, trừ từ treasury | Sink đều, plot tự xoay vòng | Cần job thu phí, hết hạn, đóng quán, xử lý tiền và đơn đang mở: thêm ít nhất 1 epic HR |
 | C. Mua đứt + thu hồi khi chủ vắng 30 ngày | Chống bỏ không | Cần luồng đóng quán; để L4 |
 
-| Giới hạn | Đề xuất | Trade-off |
+| Giới hạn | Đã chốt | Trade-off |
 |---|---|---|
 | Số quán/tài khoản | **1 quán còn hoạt động trên toàn hệ thống** (partial unique `Shop_one_live_per_owner`) | Dễ nới bằng cách xóa index; 1 quán/server thì người chơi có thể chiếm plot nhiều server |
-
-**Nếu chọn B:** thêm epic M5-E3 trước M6. Schema có sẵn `ShopStatus.CLOSED`, cần thêm `leaseExpiresAt`.
 
 ### 5.2 Important
 
@@ -2575,42 +2980,45 @@ Có thể quyết trong quá trình làm; số liệu nằm trong `GameConfig`.
 |---|---|---|---|---|---|
 | I1 | **Q6:** phí mở quán, nguyên liệu, commission, sink | §3.9: phí 5.000, supply 20%, commission 20%, phí rút 5%. Nhân viên cần khoảng 150 đơn để góp đủ nếu giữ nguyên starter | Phí thấp thì đầy plot nhanh; phí cao thì mất mục tiêu. Là số giả định, chỉnh sau playtest | M6-E5-T3 | ☐ |
 | I2 | **Q7 + moderation:** kênh chat, kiểm soát | Chỉ chat công khai theo server + bong bóng; không PM và bạn bè. Lọc từ, rate limit, report, admin mute/ban, ẩn phía client. Tên 3-20 ký tự, không trùng kể cả khác dấu | Kênh theo quán tạo cảm giác "ngồi cùng bàn" nhưng thêm contract. Lọc từ dễ lách. Chat không lưu DB thì không có bằng chứng ngoài 50 tin gần nhất | M1-E4-T5, M6-E2 | ☐ |
-| I3 | **Q8:** số người đồng thời | `softCap` 50, `hardCap` 100, xác nhận bằng load test | Bản đồ nhỏ, 50 người đã đông về hình ảnh | M6-E3-T2 | ☐ |
+| I3 | **Q8:** số người đồng thời | `softCap` 15, `hardCap` 25 là **số giả định** cho 0.1 CPU/512 MB, xác nhận bằng load test trên Render | Thấp hơn nhiều so với giả định cũ. Muốn đông hơn thì phải nâng gói Render. Chưa có số đo | M6-E3-T2 | ☐ |
 | I4 | **Rút lợi nhuận** | Chỉ chủ; không giới hạn số lần; rút toàn bộ; phí 5% đốt. Không có quỹ tối thiểu vì doanh thu đơn đã đủ trả nguyên liệu và commission | Không có khoản nợ nên giữ quỹ là vô nghĩa; về sau có lương hoặc thuê thì cần xem lại. Phí cao làm giảm động lực mở quán | M5-E2-T3 | ☐ |
 | I5 | **Timeout đơn** | TTL 10 phút, nhận tối đa 5 phút, khách rời server thì hủy đơn PENDING | TTL dài giữ tiền lâu; ngắn làm mất đơn lúc đông. Đơn ACCEPTED khi khách đã đi vẫn trừ tiền: đồ đã làm, nhưng khách có thể bất ngờ | M3-E2-T4 | ☐ |
 | I6 | **Nguồn asset** | M1-M5 dùng placeholder sinh bằng script. Trước playtest: thuê họa sĩ hoặc mua pack có giấy phép thương mại, phối màu theo §3.8. Vẽ lại logo | Họa sĩ: hợp phong cách, tốn tiền và thời gian. Pack (ví dụ pack CC0): rẻ, khó ra đúng chất phố Việt. Ảnh sinh bằng AI: nhanh, cần kiểm tra quyền và độ đồng nhất | M6-E5-T1 | ☐ |
-| I7 | **Hạ tầng, ngân sách** | 1 VPS 4 vCPU/8 GB tại khu vực gần người chơi Việt Nam, Docker Compose + Caddy, backup ngoài máy. **Chưa báo giá; PO kiểm tra theo nhà cung cấp** | Một máy là điểm hỏng duy nhất, chấp nhận cho playtest. Dịch vụ quản lý đắt hơn, ít vận hành hơn | M6-E4-T2 | ☐ |
+| I7 | **Hạ tầng** | **PO chốt: Render free tier, một repo, một web service, Region Singapore.** Chi tiết ở §3.10 | Không tốn tiền; đổi lại: 0.1 CPU, service ngủ, DB hết hạn sau 30 ngày | M1-E6-T4 | ✔ |
 | I8 | **Phaser 4 hay 3** | 4.2.1, bản ổn định hiện tại; dự phòng 3.90.0 nếu M0-E1-T5 hoặc M1-E5-T4 gặp lỗi | Phaser 3 có nhiều tài liệu và executor quen hơn nhưng là dòng cũ; game này chỉ dùng tilemap, sprite, text nên đổi được với chi phí thấp | M0-E1-T5 | ☐ |
 | I9 | **Giao diện admin** | Chỉ API và script, không có màn hình | Tiết kiệm nhiều; việc xử lý report bất tiện trong playtest | M6-E2-T1 | ☐ |
-| I10 | **Remote git, CI** | GitHub private với file CI có sẵn. Chưa có remote thì `pnpm verify` là cổng kiểm tra | Không có remote thì không có backup mã nguồn | M0-E1-T7 | ☐ |
+| I10 | **Remote git, CI** | GitHub private với file CI có sẵn. Chưa có remote thì `pnpm verify` là cổng kiểm tra. **Render cần repo này để deploy** | Không có remote thì không có backup mã nguồn và không deploy được | M1-E6-T4 | ☐ |
+| I11 | **DB sau 30 ngày** | Giữ Render Postgres free và xoay định kỳ theo §3.10.8, PO tự làm vào khoảng ngày 21 | Miễn phí, nhưng ngừng phục vụ mỗi lần xoay và **quên là mất toàn bộ dữ liệu**. Thay thế: DB Render trả phí; Postgres ngoài có gói free không hết hạn (**CHƯA kiểm tra**, plan không chọn thay PO) | M6-E4-T4 | ☐ |
+| I12 | **Tab ẩn và việc service ngủ** | Quyết sau khi có số đo M1-E6-T4. Mặc định: chỉ ngừng `world:ping` khi tab ẩn, không ngắt socket | Nếu Engine.IO heartbeat giữ service thức thì tab ẩn vẫn giữ service, không tốn thêm tiền. Ngắt socket khi tab ẩn lâu thì service ngủ được, nhưng người chơi mất session, đơn PENDING bị hủy, đơn đang làm bị trả | Sau M1-E6-T4 | ☐ |
 
 ### 5.3 Later
 
 | ID | Mục | Ghi chú |
 |---|---|---|
 | L1 | Bạn bè, tin nhắn riêng | Brief cho phép để sau |
-| L2 | OAuth, xác minh email, quên mật khẩu | Trước khi mở công khai; liên quan B5 |
+| L2 | OAuth, liên kết email, quên mật khẩu tự phục vụ | MVP không có email nên không có quên mật khẩu; admin đặt lại qua script `admin:reset-password` (M6-E2-T1). Cần nhìn lại trước khi mở công khai; liên quan B5 |
 | L3 | Sổ cái kép đầy đủ | Bút toán hiện tại đã đủ dữ liệu để chuyển đổi |
 | L4 | Thuê plot, thu hồi quán bỏ không | Schema đã có `CLOSED`; liên quan B8 |
 | L5 | `ShopUpgrade`, cosmetics, nhiều bản đồ | Cần sink mới khi có dữ liệu |
 | L6 | Lưu lịch sử chat | Cần chính sách lưu giữ dữ liệu |
 | L7 | Đa instance, Redis | §3.9 |
 | L8 | AI | Ngoài MVP theo brief; không có mã chuẩn bị nào |
+| L9 | Thu hồi tên của khách bỏ hoang | `displayNameKey` unique kể cả khách, nên khách bỏ game vẫn giữ tên. Cần luật xác định thế nào là bỏ hoang và xử lý ví, đơn của họ |
 
 ### 5.4 Trả lời 8 câu hỏi của brief §15
 
-Tất cả là đề xuất chờ xác nhận.
+Câu 1-5 thuộc Blocker, **đã chốt** ngày 05/11/2026. Câu 6-8 thuộc Important (I1, I2, I3), **vẫn là đề xuất** chờ playtest và load test; riêng mức grant ở câu 6 đã chốt theo B1.
 
-| # | Câu hỏi | Đề xuất ngắn | Mục |
-|---|---|---|---|
-| 1 | Quán mặc định có treasury và owner? | Có treasury thật; không owner; backend tự duyệt; không ai rút | B2 |
-| 2 | Quán mặc định có trả commission? | Có, cùng tỉ lệ | B2 |
-| 3 | Không có nhân viên online thì sao? | Tạm ngừng nhận đơn, không hàng chờ | B4 |
-| 4 | Giới hạn số quán/tài khoản? | 1 quán còn hoạt động trên toàn hệ thống | B8 |
-| 5 | Plot mua đứt hay thuê? | Mua đứt ở MVP | B8 |
-| 6 | Các mức giá ban đầu? | Phí mở 5.000; supply 20; commission 20%; phí rút 5%; starter 2.000; giá 100 | I1, §3.9 |
-| 7 | Bạn bè, PM hay chỉ chat công khai? | Chỉ chat công khai theo server | I2 |
-| 8 | Giới hạn người đồng thời? | Mềm 50, cứng 100, xác nhận qua load test | I3 |
+| # | Câu hỏi | Trả lời ngắn | Trạng thái | Mục |
+|---|---|---|---|---|
+| 1 | Quán mặc định có treasury và owner? | Có treasury thật; không owner; backend tự duyệt tối đa 2 nhân viên, về 0 khi qua ngày; không ai rút | ✔ Đã chốt | B2 |
+| 2 | Quán mặc định có trả commission? | Có, cùng tỉ lệ | ✔ Đã chốt | B2 |
+| 3 | Không có nhân viên online thì sao? | Tạm ngừng nhận đơn, không hàng chờ | ✔ Đã chốt | B4 |
+| 4 | Giới hạn số quán/tài khoản? | 1 quán còn hoạt động trên toàn hệ thống | ✔ Đã chốt | B8 |
+| 5 | Plot mua đứt hay thuê? | Mua đứt ở MVP | ✔ Đã chốt | B8 |
+| 6 | Các mức giá ban đầu? | Phí mở 5.000; supply 20; commission 20%; phí rút 5%; giá 100. Grant: khách 300, nâng cấp thêm 1.700 (đã chốt) | ☐ Đề xuất, trừ grant | I1, §3.9, B1 |
+| 7 | Bạn bè, PM hay chỉ chat công khai? | Chỉ chat công khai theo server | ☐ Đề xuất | I2 |
+| 8 | Giới hạn người đồng thời? | Mềm 15, cứng 25, số giả định, xác nhận qua load test trên Render | ☐ Đề xuất | I3, §3.10.7 |
 
 ---
 
@@ -2625,21 +3033,26 @@ Khả năng (K) và Tác động (T): Cao / TB / Thấp, là đánh giá định
 | R3 | Hoàn tất lặp do retry | Cao | Cao | Trạng thái + khóa ledger tất định + `clientOpId` | `order-complete` concurrency; đối soát hằng giờ | M4-E2-T2 |
 | R4 | Một user vào hai quán | TB | Cao | Partial unique + `ON CONFLICT` | `employment` concurrency | M4-E1-T2, T3 |
 | R5 | Hai người mua một plot | TB | Cao | Khóa plot + partial unique | `plot` concurrency | M5-E1-T1 |
-| R6 | Tải realtime | TB | TB | Batch 100 ms, volatile, không ghi DB khi di chuyển, cap người | Load test; `event_loop_lag` | M1-E4-T3, M6-E3 |
+| R6 | Tải realtime | TB | TB | Batch 100 ms, volatile, không ghi DB khi di chuyển, cap người. Xem R23 cho giới hạn 0.1 CPU | Load test; `event_loop_lag` | M1-E4-T3, M6-E3 |
 | R7 | Session cũ còn chạy khi session mới bắt đầu | Cao | Cao | Mutex, partial unique, `FOR SHARE`, pipeline `SESSION_STALE` | `switch` concurrency; E2E | M1-E3-T3, T4 |
 | R8 | Lạm phát | TB | Cao | Faucet có điều kiện; sink nguyên liệu, phí, khóa treasury DEFAULT | Báo cáo mint/burn | M2-E1-T4, M6-E1-T3 |
-| R9 | Ít người, quán không có khách | **Cao** | Cao | Một server, Quick Join gom người, ngồi chat không cần mua, tự duyệt nhân viên. **Không dùng NPC** | Metric đơn/người/ngày | B4, M4-E1-T3 |
-| R10 | Scope creep | TB | TB | Danh sách ngoài phạm vi; quy tắc executor; L1-L8 | Opus review | §4.1 |
-| R11 | **Mới:** Rửa faucet qua tài khoản phụ (~88,7% ở giá tối đa) | TB | TB | Playtest theo danh sách mời; báo cáo cặp giao dịch | `economy-report` | B1, M6-E1-T3 |
+| R9 | Ít người, quán không có khách | **Cao** | Cao | Một server, Quick Join gom người, ngồi chat không cần mua, tự duyệt nhân viên, vào game không cần đăng ký. **Không dùng NPC**. Cap 2 và reset mỗi ngày làm quán DEFAULT trống mỗi sáng | Metric đơn/người/ngày | B4, M4-E1-T3 |
+| R10 | Scope creep | TB | TB | Danh sách ngoài phạm vi; quy tắc executor; L1-L9 | Opus review | §4.1 |
+| R11 | **Mới:** Rửa faucet qua tài khoản phụ (~88,7% ở giá tối đa). **Khách không cần email nên tài khoản phụ dễ hơn** | **Cao** | TB | Grant khách nhỏ (300 Xu), `guestsPerIpPerDay` = 10 đếm trong DB, thưởng 1.700 Xu mới có sau khi nâng cấp; playtest theo danh sách mời; báo cáo cặp giao dịch. **Giảm được, không chặn hết** (đổi IP vẫn lách) | `economy-report`; test rửa grant | B1, B5, M1-E1-T1, M6-E1-T3, M6-E3-T3 |
 | R12 | **Mới:** Treasury âm do giá quá thấp, đơn không hoàn tất được | Cao nếu không chặn | Cao | `minPrice`, `assertProductFloors` khi khởi động, CHECK settlement | Test M5-E2-T1 | M0-E2-T4 |
-| R13 | **Mới:** Mất raw constraint khi Prisma tạo lại migration hoặc khôi phục DB | Thấp | Cao | Test `pg_catalog`, diễn tập restore | `constraints.spec` trong `pnpm verify` | M0-E2-T2, M6-E4-T3 |
+| R13 | **Mới:** Mất raw constraint khi Prisma tạo lại migration hoặc khôi phục DB | TB | Cao | Test `pg_catalog`, diễn tập restore; xoay DB làm restore thành việc định kỳ | `constraints.spec` trong `pnpm verify`; `db:restore-drill` | M0-E2-T2, M6-E4-T3 |
 | R14 | **Mới:** Executor Haiku low viết lỗi concurrency mà test vẫn qua | TB | Cao | Test viết trước, thuật toán viết sẵn, Opus review, đối soát cuối mỗi test | Review; reconcile hằng giờ | §4.1, §4.11 |
 | R15 | **Mới:** Toolchain mới: Prisma `latest` là RC, Nest 12, Phaser 4, TS 7 | TB | TB | Pin exact; đã spike phần server; có phương án dự phòng | `pnpm verify`; M0-E1-T5 | §3.1, I8 |
 | R16 | **Mới:** Tiền khách bị giữ do nhân viên nhận rồi bỏ | TB | TB | `acceptExpiresAt`, `expiresAt` không gia hạn, cap 3 đơn đang làm | Sweeper; test | M3-E2-T4, M4-E2-T3 |
-| R17 | **Mới:** Một process: khởi động lại mất presence và timer | TB | TB | Trạng thái tiền ở DB; dọn session khi khởi động; client tự nối lại | `reconnect.spec` | M1-E3-T5 |
+| R17 | **Mới:** Một process: khởi động lại mất presence và timer. Trên Render xảy ra thường xuyên | **Cao** | TB | Trạng thái tiền ở DB; `BootTasks` chạy trước `listen`; client tự nối lại | `reconnect.spec`; `boot-shutdown.spec` | M1-E3-T5, M1-E6-T1 |
 | R18 | **Mới:** Scaffold và tài liệu bên thứ ba dẫn executor sang dịch vụ ngoài (`AGENTS.md` của Nest quảng cáo Observe) | Cao nếu không xóa | Thấp | Xóa ngay trong M0-E1-T4; cấm thêm dep ngoài bảng | AC của task; review | M0-E1-T4 |
 | R19 | **Mới:** Chat độc hại, tên giả mạo trong playtest | TB | TB | Lọc từ, `displayNameKey`, report, mute, ban | Hàng đợi report | M6-E2 |
 | R20 | **Mới:** Quyền sử dụng ảnh concept và asset | Thấp | TB | Không dùng trực tiếp ảnh concept; vẽ lại logo; `LICENSES.md` | Review M6-E5-T1 | I6 |
+| R21 | **Mới:** **Mất toàn bộ DB:** Postgres free hết hạn sau 30 ngày, ân hạn 14 ngày rồi bị xóa, không có backup; xoay sai bước cũng mất dữ liệu vì phải xóa DB cũ trước khi tạo DB mới | **Cao** nếu không có lịch | **Cao** | `pnpm db:backup` chạy từ local; runbook xoay kiểm tra bản sao trước khi xóa; diễn tập trước playtest; PO đặt lịch nhắc ngày 21; I11 cân nhắc DB không hết hạn | Bảng ngày tạo DB trong `deploy/RUNBOOK.md`. **Không có cảnh báo tự động** | §3.10.8, M6-E4-T3, M6-E4-T4 |
+| R22 | **Mới:** Cold start khoảng 1 phút: người chơi đầu tiên tưởng game hỏng. Lần tải trang đầu chưa có code của ta để hiện thông báo | **Cao** | TB | Màn "Quán đang mở cửa" khi tab đã tải; `world:ping` giữ thức khi có người; báo trước trong lời mời playtest | M1-E6-T4 đo thời lượng và hành vi | §3.10.6, M1-E5-T9 |
+| R23 | **Mới:** Tải trên 0.1 CPU/512 MB vượt khả năng: tick 100 ms, argon2, reconcile hằng giờ cạnh tranh một phần mười CPU; restart do hết bộ nhớ | **Cao** | Cao | `softCap` 15, `hardCap` 25 giả định; pool 5; tối đa 2 phép băm; không có đường tăng ngoài trả tiền | M6-E3-T2 trên Render; M1-E6-T4 đo argon2 | §3.10.7, I3 |
+| R24 | **Mới:** Tài khoản khách: mất cookie là mất nhân vật và ví; tên bị khách bỏ hoang giữ; giới hạn 10 khách/ngày/IP chặn nhầm khi nhiều người chung IP (quán net, CGNAT di động) | TB | TB | Cảnh báo trên HUD; nút tạo tài khoản; hỏi sau khi apply; L9 cho tên; `guestsPerIpPerDay` chỉnh qua env | Phản hồi playtest; số `RATE_LIMITED` trên `/auth/guest` | B5, M1-E5-T8, M1-E1-T1 |
+| R25 | **Mới:** Migrate chạy trong start command: migration lỗi làm service không lên, thêm thời gian cold start | Thấp | Cao | Test khởi động lặp; `pnpm db:backup` trước khi đẩy migration; `down.sql` viết tay | `start-twice.spec`; log Render | §3.10.4, M1-E6-T3 |
 
 ---
 
@@ -2648,3 +3061,4 @@ Khả năng (K) và Tác động (T): Cao / TB / Thấp, là đánh giá định
 - [Prisma: Indexes, partial indexes](https://www.prisma.io/docs/orm/prisma-schema/data-model/indexes)
 - [NestJS v12.0.0 release](https://github.com/nestjs/nest/releases/tag/v12.0.0)
 - Version package đọc từ npm registry ngày 05/11/2026.
+- Dữ kiện Render ở §3.10.1: docs.render.com, người điều phối đọc ngày 05/11/2026; chưa kiểm chứng bằng deploy thật.

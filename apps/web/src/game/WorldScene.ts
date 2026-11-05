@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
-import { AvatarIdSchema, street01Map, type PlayerView } from '@tdvh/shared';
+import { AvatarIdSchema, getSeats, street01Map, type PlayerView } from '@tdvh/shared';
 import { useWorldStore } from '../store/worldStore';
+import { DEFAULT_AVATAR, SIT_COLUMN, WALK_COLUMNS, WALK_FRAME_MS, frameFor } from './avatar';
 import { bridge } from './bridge';
+import { RemotePlayers } from './RemotePlayers';
+import { seatPrompt } from './remote';
 import {
   dirFromVector,
   nextPosition,
@@ -16,13 +19,7 @@ import {
 } from './movement';
 
 const MAP_KEY = 'street-01';
-const DEFAULT_AVATAR = 'avatar_01';
-const AVATAR_COLUMNS = 4;
-// Hàng của spritesheet avatar: xuống, trái, phải, lên (scripts/gen-placeholder-art.ts).
-const ROW: Record<Dir, number> = { down: 0, left: 1, right: 2, up: 3 };
-// Cột đi bộ; cột 0 là đứng yên. Cột 3 là ngồi (T5), không dùng ở đây.
-const WALK_COLUMNS = [0, 1, 0, 2];
-const WALK_FRAME_MS = 150;
+const SEATS = getSeats(street01Map);
 
 interface KeyMap {
   W: Phaser.Input.Keyboard.Key;
@@ -57,6 +54,9 @@ export class WorldScene extends Phaser.Scene {
   private seq = 0;
   private walkClock = 0;
   private unsubscribeSync: (() => void) | null = null;
+  private unsubscribePlayers: (() => void) | null = null;
+  private remotes!: RemotePlayers;
+  private prompt: Phaser.GameObjects.Text | null = null;
 
   constructor() {
     super({ key: WorldScene.KEY });
@@ -81,7 +81,21 @@ export class WorldScene extends Phaser.Scene {
     });
 
     this.unsubscribeSync = bridge.on('world:position-sync', (p) => this.applySync(p));
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.unsubscribeSync?.());
+    this.remotes = new RemotePlayers(this);
+    this.remotes.sync(useWorldStore.getState().players);
+    this.unsubscribePlayers = useWorldStore.subscribe((st, prev) => {
+      if (st.players !== prev.players) this.remotes.sync(st.players);
+    });
+    this.prompt = this.add
+      .text(0, 0, '', { fontFamily: '"Be Vietnam Pro", sans-serif', fontSize: '12px', color: '#482818', stroke: '#F8E8D8', strokeThickness: 3 })
+      .setOrigin(0.5, 1)
+      .setDepth(11)
+      .setVisible(false);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.unsubscribeSync?.();
+      this.unsubscribePlayers?.();
+      this.remotes.destroy();
+    });
 
     // Đã có vị trí từ trước khi scene sẵn sàng thì dùng luôn.
     const st = useWorldStore.getState();
@@ -91,11 +105,15 @@ export class WorldScene extends Phaser.Scene {
   }
 
   update(time: number, delta: number): void {
+    this.remotes.update(time, delta);
     if (!this.avatar) return;
 
     let v: Vec = { x: 0, y: 0 };
     const typing = isTypingInField();
-    if (typing) {
+    // Đang ngồi thì server không nhận player:move: không đi bằng phím hay click.
+    const st = useWorldStore.getState();
+    const seated = st.self?.seatId != null;
+    if (typing || seated) {
       this.target = null;
     } else {
       const k = this.keys;
@@ -122,7 +140,20 @@ export class WorldScene extends Phaser.Scene {
 
     this.avatar.setPosition(this.pos.x, this.pos.y);
     this.updateFrame(moved, delta);
+    this.updatePrompt(st);
     this.syncToServer(time);
+  }
+
+  // Gợi ý E: Ngồi / E: Đứng trên đầu avatar mình. Chỉ đổi text khi nội dung đổi.
+  private updatePrompt(st: ReturnType<typeof useWorldStore.getState>): void {
+    if (!this.prompt) return;
+    const text = seatPrompt(st.self, this.pos, SEATS, st.takenSeats);
+    if (text === null) {
+      this.prompt.setVisible(false);
+      return;
+    }
+    if (this.prompt.text !== text) this.prompt.setText(text);
+    this.prompt.setPosition(this.pos.x, this.pos.y - 30).setVisible(true);
   }
 
   // Đặt lại vị trí từ server (đầu phiên hoặc bị sửa). Đây là nguồn sự thật, bỏ dự đoán cũ.
@@ -135,10 +166,10 @@ export class WorldScene extends Phaser.Scene {
     this.sent = { ...r, dir: this.dir, at: -Infinity };
 
     if (!this.avatar) {
-      this.avatar = this.add.sprite(p.x, p.y, this.avatarId, ROW[this.dir] * AVATAR_COLUMNS).setDepth(10);
+      this.avatar = this.add.sprite(p.x, p.y, this.avatarId, frameFor(this.dir, 0)).setDepth(10);
       this.cameras.main.startFollow(this.avatar, true);
     } else {
-      this.avatar.setTexture(this.avatarId, ROW[this.dir] * AVATAR_COLUMNS).setPosition(p.x, p.y);
+      this.avatar.setTexture(this.avatarId, frameFor(this.dir, 0)).setPosition(p.x, p.y);
     }
   }
 
@@ -147,8 +178,9 @@ export class WorldScene extends Phaser.Scene {
     if (moved) this.walkClock += delta;
     else this.walkClock = 0;
     const step = Math.floor(this.walkClock / WALK_FRAME_MS) % WALK_COLUMNS.length;
-    const col = moved ? WALK_COLUMNS[step]! : 0;
-    this.avatar.setFrame(ROW[this.dir] * AVATAR_COLUMNS + col);
+    const seated = useWorldStore.getState().self?.seatId != null;
+    const col = seated ? SIT_COLUMN : moved ? WALK_COLUMNS[step]! : 0;
+    this.avatar.setFrame(frameFor(this.dir, col));
   }
 
   // Gửi player:move khi vị trí làm tròn hoặc hướng đổi, và đủ nhịp tối thiểu.

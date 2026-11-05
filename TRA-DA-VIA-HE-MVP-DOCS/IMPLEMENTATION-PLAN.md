@@ -2132,7 +2132,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
 - **Đọc:** Exit M1.
 - **Phạm vi:** `apps/web/e2e/**`, `apps/web/playwright.config.ts`, `package.json` script `e2e`.
 - **Test:** 2 context: nhập tên, chọn nhân vật → chọn server → thấy nhau → một người di chuyển, người kia thấy vị trí đổi → chat tới nhau. F5 giữ phiên và trở lại đúng server. Tab 2 chiếm phiên, tab 1 hiện "Chơi ở tab này". Chuyển server: người ở lại thấy người kia biến mất. Tạo tài khoản bằng nút HUD, đăng xuất, đăng nhập lại bằng `username`: cùng tên và nhân vật.
-- **AC:** script tự khởi động server, web và DB test với `GAME_guestsPerIpPerDay=1000`, trừ khi có `PLAYWRIGHT_BASE_URL` thì chạy thẳng trên URL đó. Tên người chơi trong test ngẫu nhiên vì `displayNameKey` unique. Chạy lặp 3 lần đều đạt.
+- **AC:** script tự khởi động server, web và DB test với `GAME_GUESTS_PER_IP_PER_DAY=1000`, trừ khi có `PLAYWRIGHT_BASE_URL` thì chạy thẳng trên URL đó. Tên người chơi trong test ngẫu nhiên vì `displayNameKey` unique. Chạy lặp 3 lần đều đạt.
 - **Verify:** `pnpm e2e`.
 
 #### M1-E5-T8 — Form tạo tài khoản, nút HUD, cảnh báo khách
@@ -2551,7 +2551,7 @@ Các task HR **không chạy song song** nếu cùng chạm `economy/` hoặc `o
   - Hoàn tất đua với chuyển server: `SESSION_STALE` hoặc thành công hợp lệ.
   - `ORDER_TOO_EARLY`, `ORDER_ACCEPT_EXPIRED` với clock giả.
   - Khách có `held` đủ nhưng `available=0` vẫn capture được: hold bảo đảm tiền.
-  - Đổi `GAME_commissionBps` sau khi tạo đơn: dùng snapshot.
+  - Đổi `GAME_COMMISSION_BPS` sau khi tạo đơn: dùng snapshot.
   - Mỗi test tiền kết thúc bằng `assertReconciled()`.
 - **AC:** đúng 8 bước §3.6.4; `check:money` đạt. Event phát sau commit, replay không phát.
 - **Verify:** `pnpm --filter @tdvh/server exec vitest run src/orders/order-settlement.spec.ts test/concurrency/order-complete.concurrency.spec.ts` (3 lần).
@@ -2782,7 +2782,7 @@ M6-E4-T1 (Dockerfile) và M6-E4-T2 (Compose production, reverse proxy) đã bỏ
 - **Đọc:** §5.2 I3, §3.10.7, M6-E3-T1.
 - **Phạm vi:** `docs/loadtest/<yyyy-mm-dd>.md`.
 - **Test:** không viết test mới; đây là lần đo. Kịch bản là 4 mức tải nêu trên.
-- **Việc:** chạy **trên Render free**, trước khi mời người chơi, công cụ chạy từ máy local. PO đặt tạm `GAME_guestsPerIpPerDay=1000` trên dashboard và thêm host vào `LOADTEST_ALLOWED_HOSTS`, xong thì gỡ. Chạy 5, 10, 15, 25 kết nối, mỗi mức 10 phút. Ghi bảng số liệu thô, kèm `tdvh_event_loop_lag_seconds` đọc từ `/metrics` bằng token.
+- **Việc:** chạy **trên Render free**, trước khi mời người chơi, công cụ chạy từ máy local. PO đặt tạm `GAME_GUESTS_PER_IP_PER_DAY=1000` trên dashboard và thêm host vào `LOADTEST_ALLOWED_HOSTS`, xong thì gỡ. Chạy 5, 10, 15, 25 kết nối, mỗi mức 10 phút. Ghi bảng số liệu thô, kèm `tdvh_event_loop_lag_seconds` đọc từ `/metrics` bằng token.
 - **Mục tiêu đề xuất:** ở `softCap` (15): p95 ack < 300 ms, event loop lag p99 < 100 ms, độ trễ `player:moved` p95 < 300 ms, không restart do hết 512 MB, không có reconcile violation. Render free không cho số liệu CPU qua API; lấy biểu đồ từ dashboard nếu có. Nêu kết quả đúng như đo được, không suy diễn nguyên nhân khi không có bằng chứng.
 - **AC:** có số liệu cả 4 mức; ghi rõ đây là 0.1 CPU/512 MB. Quyết định đổi `softCap`/`hardCap` thuộc về người dùng. User `lt*` nằm lại trong DB; dọn bằng cách tạo lại DB trước buổi playtest.
 - **Verify:** tệp báo cáo tồn tại; `DATABASE_URL=<external URL> pnpm --filter @tdvh/server reconcile` sạch.

@@ -181,41 +181,41 @@ importers:
         specifier: workspace:*
         version: link:../../packages/shared
       reflect-metadata:
-        specifier: ^0.2.2
+        specifier: 0.2.2
         version: 0.2.2
       rxjs:
-        specifier: ^7.8.1
+        specifier: 7.8.2
         version: 7.8.2
     devDependencies:
       '@nestjs/cli':
         specifier: 12.0.10
         version: 12.0.10(@types/node@24.19.2)(prettier@3.9.10)
       '@nestjs/schematics':
-        specifier: ^12.0.0
+        specifier: 12.0.12
         version: 12.0.12(chokidar@5.0.0)(prettier@3.9.10)(typescript@6.0.3)
       '@nestjs/testing':
         specifier: 12.2.0
         version: 12.2.0(@nestjs/common@12.2.0(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(@nestjs/core@12.2.0)(@nestjs/platform-express@12.2.0)
       '@types/express':
-        specifier: ^5.0.0
+        specifier: 5.0.6
         version: 5.0.6
       '@types/node':
-        specifier: ^24.0.0
+        specifier: 24.19.2
         version: 24.19.2
       '@vitest/coverage-v8':
-        specifier: ^4.1.2
+        specifier: 4.1.12
         version: 4.1.12(vitest@4.1.12)
       oxlint:
         specifier: 1.89.0
         version: 1.89.0(oxlint-tsgolint@7.0.2005)
       oxlint-tsgolint:
-        specifier: ^7.0.2001
+        specifier: 7.0.2005
         version: 7.0.2005
       prettier:
         specifier: 3.9.10
         version: 3.9.10
       source-map-support:
-        specifier: ^0.5.21
+        specifier: 0.5.21
         version: 0.5.21
       tsx:
         specifier: 4.23.15

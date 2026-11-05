@@ -8,3 +8,5 @@ apps/server/src/generated
 *.log
 playwright-report
 test-results
+
+*.tsbuildinfo

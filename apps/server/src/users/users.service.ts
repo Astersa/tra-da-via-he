@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { displayNameKey, type AvatarIdSchema } from '@tdvh/shared';
+import { displayNameKey, type AvatarIdSchema, type PatchProfileReq } from '@tdvh/shared';
 import type { z } from 'zod';
 import { AppError } from '../core/errors.js';
 import { pgCode, type Tx } from '../core/tx.js';
+import { PrismaService } from '../core/prisma.service.js';
 
 export interface NewGuest {
   displayName: string;
@@ -16,8 +17,12 @@ function isUniqueViolation(err: unknown, constraintFragment: string): boolean {
   return JSON.stringify(cause ?? {}).includes(constraintFragment) || String((err as Error).message).includes(constraintFragment);
 }
 
+const iso = (d: Date): string => d.toISOString();
+
 @Injectable()
 export class UsersService {
+  constructor(private readonly prisma: PrismaService) {}
+
   // Runs inside the caller's transaction. Creates User (GUEST), PlayerProfile and an empty Wallet.
   async createGuest(tx: Tx, input: NewGuest) {
     try {
@@ -35,6 +40,41 @@ export class UsersService {
         },
         include: { profile: true, wallet: true },
       });
+    } catch (err) {
+      if (isUniqueViolation(err, 'displayNameKey')) throw new AppError('DISPLAY_NAME_TAKEN');
+      throw err;
+    }
+  }
+
+  // Own user only. passwordHash is never selected or returned.
+  async getMe(userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, include: { profile: true } });
+    if (!user || !user.profile) throw new AppError('NOT_FOUND');
+    return {
+      user: {
+        id: user.id,
+        kind: user.kind,
+        username: user.username,
+        role: user.role,
+        mutedUntil: user.mutedUntil ? iso(user.mutedUntil) : null,
+        createdAt: iso(user.createdAt),
+      },
+      profile: { userId: user.id, displayName: user.profile.displayName, avatarId: user.profile.avatarId },
+    };
+  }
+
+  // Renaming a character: displayNameKey follows displayName. A clash with another profile is
+  // DISPLAY_NAME_TAKEN; keeping one's own current name does not clash (the unique index skips own row).
+  async updateProfile(userId: string, input: PatchProfileReq) {
+    const data: { displayName?: string; displayNameKey?: string; avatarId?: string } = {};
+    if (input.displayName !== undefined) {
+      data.displayName = input.displayName;
+      data.displayNameKey = displayNameKey(input.displayName);
+    }
+    if (input.avatarId !== undefined) data.avatarId = input.avatarId;
+    try {
+      const profile = await this.prisma.playerProfile.update({ where: { userId }, data });
+      return { userId: profile.userId, displayName: profile.displayName, avatarId: profile.avatarId };
     } catch (err) {
       if (isUniqueViolation(err, 'displayNameKey')) throw new AppError('DISPLAY_NAME_TAKEN');
       throw err;

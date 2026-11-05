@@ -9,7 +9,7 @@ import { PrismaService } from '../core/prisma.service.js';
 import { withTx } from '../core/tx.js';
 import { UsersService } from '../users/users.service.js';
 import { PasswordService } from './password.service.js';
-import { JWT_SECRET, signAccessToken } from './jwt.js';
+import { JWT_SECRET, signAccessToken } from '../core/jwt.js';
 import { RefreshTokenService, type IssuedRefresh } from './refresh-token.service.js';
 
 export const AUTH_GUEST_CREATED = 'AUTH_GUEST_CREATED';

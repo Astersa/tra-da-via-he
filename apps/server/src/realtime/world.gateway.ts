@@ -2,11 +2,15 @@ import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import {
   EmptySchema,
   getSpawn,
+  PlayerInteractReqSchema,
   PlayerMoveReqSchema,
+  PlayerSitReqSchema,
   ServerSwitchReqSchema,
   street01Map,
   WorldJoinReqSchema,
+  type PlayerInteractReq,
   type PlayerMoveReq,
+  type PlayerSitReq,
   type ServerSwitchReq,
   type WorldJoinReq,
   type WorldState,
@@ -21,12 +25,13 @@ import { SessionEndHooks, type SessionEndedEvent } from '../session/session-end.
 import { SessionService } from '../session/session.service.js';
 import { MovementService } from '../world/movement.service.js';
 import { PresenceStore, type PresenceEntry } from '../world/presence.store.js';
+import { SeatService } from '../world/seats.service.js';
 import { ConnectionRegistry } from './connection-registry.js';
 import { EventRouter, type EventCtx, type SocketData } from './event-router.js';
 import { PromiseChainUserMutex } from './user-mutex.js';
 import { WorldStateBuilder } from './world-state.builder.js';
 
-// IMPLEMENTATION-PLAN.md §3.4 (world:*, server:switch, player:move), §3.5.2, §3.5.3 (M1-E3-T4), §3.5.2 grace (M1-E3-T5).
+// IMPLEMENTATION-PLAN.md §3.4 (world:*, server:switch, player:move, player:interact/sit/stand), §3.5.2, §3.5.3 (M1-E3-T4), §3.5.2 grace (M1-E3-T5), seats and emote (M1-E4-T4).
 // A provider, not a second gateway: it only registers its routes on EventRouter. Every route runs through
 // EventPipeline (RealtimeGateway) and then inside this user's lock. Events go out only after the DB commit.
 @Injectable()
@@ -46,6 +51,7 @@ export class WorldGateway implements OnModuleInit {
     @Inject(SessionEndHooks) private readonly hooks: SessionEndHooks,
     @Inject(PresenceStore) private readonly presence: PresenceStore,
     @Inject(MovementService) private readonly movement: MovementService,
+    @Inject(SeatService) private readonly seats: SeatService,
     @Inject(WorldStateBuilder) private readonly builder: WorldStateBuilder,
     @Inject(ReconnectService) private readonly reconnect: ReconnectService,
     @Inject(PrismaService) private readonly prisma: PrismaService,
@@ -87,6 +93,25 @@ export class WorldGateway implements OnModuleInit {
           this.move(ctx, req);
           return {};
         }),
+    });
+    this.router.register('player:interact', {
+      schema: PlayerInteractReqSchema,
+      requireSession: true,
+      fn: (ctx, req) =>
+        this.locked(ctx, async () => {
+          this.emote(ctx, req);
+          return {};
+        }),
+    });
+    this.router.register('player:sit', {
+      schema: PlayerSitReqSchema,
+      requireSession: true,
+      fn: (ctx, req) => this.locked(ctx, async () => this.sit(ctx, req)),
+    });
+    this.router.register('player:stand', {
+      schema: EmptySchema,
+      requireSession: true,
+      fn: (ctx) => this.locked(ctx, async () => this.stand(ctx)),
     });
   }
 
@@ -175,7 +200,39 @@ export class WorldGateway implements OnModuleInit {
     this.movement.apply(entry, req, this.clock.now().getTime());
   }
 
+  // Seated players are checked against their own presence entry, like move (the seat is in that entry).
+  private ownEntry(ctx: EventCtx): { cur: { sessionId: string; serverId: string }; entry: PresenceEntry } {
+    const cur = this.current(ctx);
+    const entry = this.presence.get(ctx.userId);
+    if (!entry || entry.sessionId !== cur.sessionId || entry.serverId !== cur.serverId) throw new AppError('SESSION_STALE');
+    return { cur, entry };
+  }
+
+  // Emote goes to the whole server room, the sender included (§3.4.3). Seated or not.
+  private emote(ctx: EventCtx, req: PlayerInteractReq): void {
+    const cur = this.current(ctx);
+    this.publisher.toServer(cur.serverId, 'player:interacted', { userId: ctx.userId, kind: req.kind });
+  }
+
+  private sit(ctx: EventCtx, req: PlayerSitReq): { seatId: string } {
+    const { cur, entry } = this.ownEntry(ctx);
+    const { seat, changed } = this.seats.sit(entry, req.seatId);
+    if (changed) {
+      this.publisher.toServer(cur.serverId, 'player:interacted', { userId: ctx.userId, state: 'SIT', seatId: seat.id });
+    }
+    return { seatId: seat.id };
+  }
+
+  private stand(ctx: EventCtx): Record<string, never> {
+    const { cur, entry } = this.ownEntry(ctx);
+    if (this.seats.stand(entry)) {
+      this.publisher.toServer(cur.serverId, 'player:interacted', { userId: ctx.userId, state: 'STAND' });
+    }
+    return {};
+  }
+
   // Runs for every session that ends (after commit). Presence is removed only for the ended session.
+  // The seat is held by the presence entry (SeatService), so removing the entry frees it: every end path frees it.
   // The last position is written before presence is removed (M1-E4-T3: positions reach the DB only here).
   private async onSessionEnded(e: SessionEndedEvent): Promise<void> {
     if (this.reconnect.pendingFor(e.userId)?.sessionId === e.sessionId) this.reconnect.cancel(e.userId);

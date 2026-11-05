@@ -27,6 +27,8 @@
     "@nestjs/common": "12.2.0",
     "@nestjs/core": "12.2.0",
     "@nestjs/platform-express": "12.2.0",
+    "@nestjs/platform-socket.io": "12.2.0",
+    "@nestjs/websockets": "12.2.0",
     "@node-rs/argon2": "2.2.2",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
@@ -36,6 +38,7 @@
     "pg": "8.23.1",
     "reflect-metadata": "0.2.2",
     "rxjs": "7.8.2",
+    "socket.io": "4.8.4",
     "zod": "4.6.7"
   },
   "devDependencies": {
@@ -51,6 +54,7 @@
     "oxlint-tsgolint": "7.0.2005",
     "prettier": "3.9.10",
     "prisma": "7.10.1",
+    "socket.io-client": "4.8.4",
     "source-map-support": "0.5.21",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
